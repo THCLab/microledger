@@ -1,51 +1,58 @@
-use crate::{ControlingIdentifiers, DigitalFingerprint, Seals, Serialization, Signatures};
+use crate::{
+    ControlingIdentifier, DigitalFingerprint, Seal, SealProvider, Serialization, Signature,
+};
 
-pub struct Block<I, D, C>
+pub struct Block<I, D, C, P>
 where
-    I: Seals,
+    I: Seal,
     D: DigitalFingerprint,
-    C: ControlingIdentifiers,
+    C: ControlingIdentifier,
+    P: SealProvider,
 {
     seals: I,
     previos: Option<D>,
     rules: C,
+    seal_provider: P,
 }
 
-impl<I, D, C> Serialization for Block<I, D, C>
+impl<I, D, C, P> Serialization for Block<I, D, C, P>
 where
-    I: Seals,
+    I: Seal,
     D: DigitalFingerprint,
-    C: ControlingIdentifiers,
+    C: ControlingIdentifier,
+    P: SealProvider,
 {
     fn serialize(&self) -> Vec<u8> {
         todo!()
     }
 }
 
-pub struct SignedBlock<I, C, D, S>
+pub struct SignedBlock<I, C, D, S, P>
 where
-    I: Seals,
-    C: ControlingIdentifiers,
+    I: Seal,
+    C: ControlingIdentifier,
     D: DigitalFingerprint,
-    S: Signatures,
+    S: Signature,
+    P: SealProvider,
 {
-    block: Block<I, D, C>,
+    block: Block<I, D, C, P>,
     signatures: Vec<S>,
 }
 
-impl<I, D, C> Block<I, D, C>
+impl<I, D, C, P> Block<I, D, C, P>
 where
-    I: Seals,
-    C: ControlingIdentifiers,
+    I: Seal,
+    C: ControlingIdentifier,
     D: DigitalFingerprint,
+    P: SealProvider,
 {
-    fn check_block(&self, block: Block<I, D, C>) -> bool {
+    fn check_block(&self, block: Block<I, D, C, P>) -> bool {
         match &block.previos {
             Some(prev) => {
                 // check if previous event matches
                 if prev.verify_binding(&self.serialize()) {
                     // check if seal of given hash exists
-                    if block.seals.get().is_some() {
+                    if block.seal_provider.check(&self.seals) {
                         // ok, block can be added
                         true
                     } else {
@@ -60,11 +67,11 @@ where
             None => {
                 // it's initial block
                 todo!()
-            },
+            }
         }
     }
 
-    pub fn append<S: Signatures>(&self, block: SignedBlock<I, C, D, S>) -> bool {
+    pub fn append<S: Signature>(&self, block: SignedBlock<I, C, D, S, P>) -> bool {
         if self.rules.check_signatures(block.signatures) {
             self.check_block(block.block)
         } else {
