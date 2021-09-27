@@ -1,14 +1,24 @@
-trait Seals {}
+pub mod block;
 
-trait ControlingIdentifiers {}
+pub trait Seals {
+    fn get(&self) -> Option<String>;
+}
 
-trait DigitalFingerprint {}
+pub trait ControlingIdentifiers {
+    fn check_signatures<S: Signatures>(&self, signatures: Vec<S>) -> bool;
+}
 
-trait Signatures {}
+pub trait DigitalFingerprint {
+    fn verify_binding(&self, data: &[u8]) -> bool;
+}
 
-trait Encoding {}
+pub trait Signatures {}
 
-trait Serialization {}
+pub trait Encoding {}
+
+pub trait Serialization {
+    fn serialize(&self) -> Vec<u8>;
+}
 
 #[cfg(test)]
 mod tests {}
