@@ -43,7 +43,7 @@ where
     pub fn new(seal: I, previous: Option<D>, rules: C, seal_provider: P) -> Self {
         Self {
             seals: seal,
-            previous: previous,
+            previous,
             rules,
             seal_provider,
         }
@@ -56,7 +56,7 @@ where
     ) -> SignedBlock<I, C, D, S, P> {
         let mut attachements_dict = HashMap::new();
         if !attachements.is_empty() {
-            attachements.into_iter().for_each(|(k, v)| {
+            attachements.iter().for_each(|(k, v)| {
                 attachements_dict.insert(k.to_string(), v.to_string());
             });
         };
@@ -118,7 +118,7 @@ where
 // Dictionary with hash of data as a key and data as value.
 pub type Attachement = HashMap<String, String>;
 
-impl SealProvider for Attachement{
+impl SealProvider for Attachement {
     fn check<S: Seal>(&self, s: &S) -> bool {
         self.get(&s.to_str()).is_some()
     }
@@ -127,7 +127,6 @@ impl SealProvider for Attachement{
         self.get(&s.to_str()).map(|s| s.to_owned())
     }
 }
-
 
 #[derive(Clone, Serialize)]
 pub struct SignedBlock<I, C, D, S, P>
@@ -148,7 +147,7 @@ where
 
 #[cfg(test)]
 pub mod test {
-    use keri::{prefix::SelfSigningPrefix, signer::{CryptoBox}};
+    use keri::{prefix::SelfSigningPrefix, signer::CryptoBox};
     use said::{derivation::SelfAddressing, prefix::SelfAddressingPrefix};
 
     use crate::{
@@ -156,7 +155,7 @@ pub mod test {
     };
     #[test]
     fn test_block_serialization() {
-        let pk = CryptoBox::new().unwrap().next_pub_key.key();// .public_key().key();
+        let pk = CryptoBox::new().unwrap().next_pub_key.key(); // .public_key().key();
         let seal = SelfAddressing::Blake3_256.derive("exmaple".as_bytes());
         let prev: Option<SelfAddressingPrefix> =
             Some(SelfAddressing::Blake3_256.derive("exmaple".as_bytes()));

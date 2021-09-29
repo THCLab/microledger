@@ -9,7 +9,7 @@ pub trait SealProvider {
     fn get<S: Seal>(&self, s: &S) -> Option<String>;
 }
 
-#[derive(Serialize, Deserialize)]
+#[derive(Serialize, Deserialize, Default)]
 pub struct DummyProvider {
     seals: HashMap<String, String>,
 }
@@ -24,9 +24,7 @@ impl DummyProvider {
     pub fn insert(&self, (k, v): (String, String)) -> Self {
         let mut new_hm = self.seals.clone();
         new_hm.insert(k, v);
-        DummyProvider {
-            seals: new_hm,
-        }
+        DummyProvider { seals: new_hm }
     }
 }
 

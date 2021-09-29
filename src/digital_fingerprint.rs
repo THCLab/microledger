@@ -13,5 +13,4 @@ impl DigitalFingerprint for SelfAddressingPrefix {
     fn derive(data: &[u8]) -> Self {
         SelfAddressing::Blake3_256.derive(data)
     }
-
 }
