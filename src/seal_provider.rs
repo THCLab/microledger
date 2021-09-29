@@ -20,6 +20,14 @@ impl DummyProvider {
             seals: HashMap::new(),
         }
     }
+
+    pub fn insert(&self, (k, v): (String, String)) -> Self {
+        let mut new_hm = self.seals.clone();
+        new_hm.insert(k, v);
+        DummyProvider {
+            seals: new_hm,
+        }
+    }
 }
 
 impl SealProvider for DummyProvider {
