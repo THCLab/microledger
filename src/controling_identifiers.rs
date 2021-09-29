@@ -6,13 +6,13 @@ use keri::{
 
 use serde::{Deserialize, Serialize};
 
-use crate::signature::Signature;
+use crate::{error::Error, signature::Signature};
 
 pub trait ControlingIdentifier {
-    fn check_signatures<S: Signature>(&self, msg: &[u8], signatures: &[S]) -> bool;
+    fn check_signatures<S: Signature>(&self, msg: &[u8], signatures: &[S]) -> Result<bool, Error>;
 }
 
-#[derive(Serialize, Deserialize)]
+#[derive(Serialize, Deserialize, Clone)]
 pub struct Rules {
     public_keys: Vec<BasicPrefix>,
 }
@@ -28,16 +28,12 @@ impl Rules {
 }
 
 impl ControlingIdentifier for Rules {
-    fn check_signatures<S: Signature>(&self, msg: &[u8], signatures: &[S]) -> bool {
-        // any of keys can verify signatures
-        self.public_keys
-            .iter()
-            .map(|pk| {
-                signatures
-                    .iter()
-                    .map(|s| s.verify_with(msg, &pk.derivative()))
-                    .any(|e| e)
-            })
-            .all(|e| e)
+    fn check_signatures<S: Signature>(&self, msg: &[u8], signatures: &[S]) -> Result<bool, Error> {
+        // Check if any of keys can verify signatures
+        Ok(self.public_keys.iter().all(|pk| {
+            signatures
+                .iter()
+                .any(|s| s.verify_with(msg, &pk.derivative()).unwrap_or(false))
+        }))
     }
 }

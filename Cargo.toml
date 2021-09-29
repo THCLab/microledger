@@ -14,3 +14,4 @@ said = "0.1.2"
 keri = "0.8.0"
 ed25519-dalek = "1.0.1"
 rand = { version = "0.7.3", features = ["std", "getrandom"]}
+thiserror = "1.0.29"

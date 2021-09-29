@@ -9,7 +9,7 @@ pub trait SealProvider {
     fn get<S: Seal>(&self, s: &S) -> Option<String>;
 }
 
-#[derive(Serialize, Deserialize, Default)]
+#[derive(Serialize, Deserialize, Default, Clone)]
 pub struct DummyProvider {
     seals: HashMap<String, String>,
 }
