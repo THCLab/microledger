@@ -9,9 +9,9 @@ use crate::{
 #[derive(Clone, Serialize, Deserialize)]
 pub struct Block<I, D, C>
 where
-    I: Seal + Serialize,
-    D: DigitalFingerprint + Serialize,
-    C: ControlingIdentifier + Serialize + Clone,
+    I: Seal,
+    D: DigitalFingerprint,
+    C: ControlingIdentifier + Clone,
 {
     pub seals: Vec<I>,
     pub previous: Option<D>,
@@ -73,7 +73,7 @@ where
     }
 }
 
-#[derive(Clone, Serialize)]
+#[derive(Clone, Serialize, Deserialize)]
 pub struct SignedBlock<I, C, D, S, P>
 where
     I: Seal + Serialize,

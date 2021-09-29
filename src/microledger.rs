@@ -1,4 +1,4 @@
-use serde::Serialize;
+use serde::{Deserialize, Serialize};
 
 use crate::error::Error;
 use crate::Serialization;
@@ -13,7 +13,7 @@ use crate::{
 
 pub type Result<T> = std::result::Result<T, Error>;
 
-#[derive(Default)]
+#[derive(Default, Serialize, Deserialize)]
 pub struct MicroLedger<I, D, C, S, P>
 where
     I: Seal + Serialize,
@@ -72,3 +72,28 @@ where
         }
     }
 }
+
+
+#[cfg(test)]
+pub mod test {
+    use keri::prefix::SelfSigningPrefix;
+    use said::prefix::SelfAddressingPrefix;
+
+    use crate::{controling_identifiers::Rules, microledger::MicroLedger, seal_provider::SealsAttachement};
+
+#[test]
+fn test_microledger_deserialization() {
+
+    type MicroledgerExample = MicroLedger<
+    SelfAddressingPrefix,
+    SelfAddressingPrefix,
+    Rules,
+    SelfSigningPrefix,
+    SealsAttachement,
+>;
+
+    let serialized_microledger = r#"{"blocks":[{"bl":{"seals":["ELw56P7ccBSkFj-THMErcH7RFX2Ph1fDUfQ1ErEmDuD4"],"previous":null,"rules":{"public_keys":["DNMchIYJM4PJim29UD5FMNtoKmWNFd6MX0Y2yXj2sfPY"]}},"si":["0Bypyj6RJaj-TkFD0hy4894ijV9ECxFhxWijqY1lB1Eya_Cp-Au1903ZN8f6BA98FuHW7tJNsMI_ihb5vgTFj-Aw"],"at":{"seals":{"ELw56P7ccBSkFj-THMErcH7RFX2Ph1fDUfQ1ErEmDuD4":"some message"}}},{"bl":{"seals":["EkmxFLOdaFuSibYsu6lSmab8RnIUKxjYoI6dzVawLx6g"],"previous":"EvcWUIdjA2xqEGNzf4NMNgZSPNS-C1x80aae20t_EdK0","rules":{"public_keys":["Dp-HXh0oSCldjgbYO29hYrd0R2BJYjgwrNxsJRY_ABPs"]}},"si":["0B83IzQY_CS2jdzC3Ymj3u6PO0vTmk34r4aYzIELUr5B0XAT_Z2qlkVFn0WYYGqLY6xsPl9xl1GQwGEtosx1JNBA"],"at":{"seals":{"EkmxFLOdaFuSibYsu6lSmab8RnIUKxjYoI6dzVawLx6g":"another message"}}}]}"#;
+    let deserialize_microledger: MicroledgerExample =
+        serde_json::from_str(&serialized_microledger).unwrap();
+    assert_eq!(2, deserialize_microledger.blocks.len());
+}}
