@@ -14,18 +14,18 @@ use crate::{
 pub type Result<T> = std::result::Result<T, Error>;
 
 #[derive(Default)]
-pub struct MicroLedger<I, D, C, P, S>
+pub struct MicroLedger<I, D, C, S, P>
 where
     I: Seal + Serialize,
     D: DigitalFingerprint + Serialize,
     C: ControlingIdentifier + Serialize + Clone,
-    P: SealProvider + Serialize,
     S: Signature + Serialize,
+    P: SealProvider + Serialize,
 {
     pub blocks: Vec<SignedBlock<I, C, D, S, P>>,
 }
 
-impl<I, D, C, P, S> MicroLedger<I, D, C, P, S>
+impl<I, D, C, P, S> MicroLedger<I, D, C, S, P>
 where
     I: Seal + Serialize + Clone,
     D: DigitalFingerprint + Serialize,
@@ -37,12 +37,7 @@ where
         MicroLedger { blocks: vec![] }
     }
 
-    pub fn pre_anchor_block(
-        &self,
-        attachements: Vec<I>,
-        seals_prov: P,
-        rules: C,
-    ) -> Block<I, D, C, P>
+    pub fn pre_anchor_block(&self, attachements: Vec<I>, rules: C) -> Block<I, D, C>
     where
         I: Seal + Serialize + Clone,
         D: DigitalFingerprint + Serialize,
@@ -55,10 +50,10 @@ where
             .last()
             .map(|sb| D::derive(&Serialization::serialize(&sb.block)));
 
-        Block::new(attachements, prev, rules, seals_prov)
+        Block::new(attachements, prev, rules)
     }
 
-    fn get_last_block(&self) -> Option<&Block<I, D, C, P>> {
+    fn get_last_block(&self) -> Option<&Block<I, D, C>> {
         self.blocks.last().map(|last| &last.block)
     }
 
@@ -70,7 +65,8 @@ where
         let last = self.get_last_block();
         // Checks block binding and signatures.
         if block.check_block(last)? && block.verify(self.current_rules()?)? {
-            Ok(self.blocks.push(block))
+            self.blocks.push(block);
+            Ok(())
         } else {
             Err(Error::MicroError("Wrong block".into()))
         }

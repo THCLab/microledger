@@ -1,10 +1,12 @@
-use ::microledger::{microledger::MicroLedger, seal_provider::DummyProvider};
+use ::microledger::microledger::MicroLedger;
 use keri::{
     derivation::self_signing::SelfSigning,
     keys::{PrivateKey, PublicKey},
     prefix::SelfSigningPrefix,
 };
-use microledger::{controling_identifiers::Rules, error::Error, Serialization};
+use microledger::{
+    controling_identifiers::Rules, error::Error, seal_provider::Attachement, Serialization,
+};
 use rand::rngs::OsRng;
 use said::{derivation::SelfAddressing, prefix::SelfAddressingPrefix};
 
@@ -21,43 +23,55 @@ fn test() -> Result<(), Error> {
         SelfAddressingPrefix,
         SelfAddressingPrefix,
         Rules,
-        DummyProvider,
         SelfSigningPrefix,
+        Attachement,
     > = MicroLedger::new();
     let (pk, sk) = generate_key_pair();
-    let (npk, nsk) = generate_key_pair();
-    let seal = SelfAddressing::Blake3_256.derive("exmaple".as_bytes());
+
+    let payload = "some message";
+    let seal = SelfAddressing::Blake3_256.derive(payload.as_bytes());
     let rules = Rules::new(vec![pk.key()]);
-    let provider = DummyProvider::new().insert((seal.to_string(), "example".to_string()));
-    let block = microledger.pre_anchor_block(vec![seal.clone()], provider, rules);
+    // Insert payload to SealsAttachement
+    let mut provider = Attachement::new();
+    provider.insert(seal.to_string(), payload.to_string());
+
+    let block = microledger.pre_anchor_block(vec![seal.clone()], rules);
     // println!("{}", String::from_utf8(block.serialize()).unwrap());
-    
+
+    // Sign block, attach signature and seal provider.
     let signature_raw = sk.sign_ed(&block.serialize()).unwrap();
     let s = SelfSigning::Ed25519Sha512.derive(signature_raw);
-    let signed_block = block.to_signed_block(vec![s], &[(seal.to_string(), "example".to_string())]);
+    let signed_block = block.to_signed_block(vec![s], provider);
+
+    // Attach block to microledger.
     microledger.anchor(signed_block)?;
     assert_eq!(1, microledger.blocks.len());
-    
-    let seal = SelfAddressing::Blake3_256.derive("exmaple2".as_bytes());
+
+    // Prepeare data to new block.
+    let payload = "another message";
+    let (npk, _nsk) = generate_key_pair();
+    let seal = SelfAddressing::Blake3_256.derive(payload.as_bytes());
     let rules = Rules::new(vec![npk.key()]);
-    let provider = DummyProvider::new().insert((seal.to_string(), "example2".to_string()));
-    
-    let block = microledger.pre_anchor_block(vec![seal.clone()], provider.clone(), rules.clone());
+    let mut provider = Attachement::new();
+    provider.insert(seal.to_string(), payload.to_string());
+
+    let block = microledger.pre_anchor_block(vec![seal.clone()], rules.clone());
 
     // try to append block with wrong signature
     let (_wrong_pk, wrong_sk) = generate_key_pair();
     let signature_raw = wrong_sk.sign_ed(&block.serialize()).unwrap();
     let s = SelfSigning::Ed25519Sha512.derive(signature_raw);
-    let signed_block = block.to_signed_block(vec![s], &[(seal.to_string(), "example".to_string())]);
-    let result =  microledger.anchor(signed_block);
+
+    let signed_block = block.to_signed_block(vec![s], provider.clone());
+    let result = microledger.anchor(signed_block);
     assert!(result.is_err());
     assert_eq!(1, microledger.blocks.len());
 
-    // Now sign block with proper keys and append it.
-    let block = microledger.pre_anchor_block(vec![seal.clone()], provider, rules);
+    // Now sign block the same block with proper keys and append it.
+    let block = microledger.pre_anchor_block(vec![seal.clone()], rules);
     let signature_raw = sk.sign_ed(&block.serialize()).unwrap();
     let s = SelfSigning::Ed25519Sha512.derive(signature_raw);
-    let signed_block = block.to_signed_block(vec![s], &[(seal.to_string(), "example".to_string())]);
+    let signed_block = block.to_signed_block(vec![s], provider);
     microledger.anchor(signed_block)?;
 
     assert_eq!(2, microledger.blocks.len());

@@ -11,6 +11,6 @@ impl Signature for SelfSigningPrefix {
         Basic::Ed25519
             .derive(PublicKey::new(pk.to_vec()))
             .verify(data, self)
-            .map_err(|e| Error::SignatureVerificationError(e))
+            .map_err(Error::SignatureVerificationError)
     }
 }
