@@ -52,7 +52,7 @@ where
     }
 
     pub fn attach(&mut self, data: &[u8]) -> Result<()> {
-        let mut attachements = self.attachements.clone().unwrap_or(SealsAttachement::new());
+        let mut attachements = self.attachements.clone().unwrap_or_default();
         let seal: I = attachements.save(data).unwrap();
         self.seals.push(seal);
         self.attachements = Some(attachements);

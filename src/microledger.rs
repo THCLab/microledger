@@ -56,6 +56,22 @@ where
         self.blocks.last().map(|last| &last.block)
     }
 
+    fn at(&self, block_id: D) -> Option<Self> {
+        let position = self
+            .blocks
+            .clone()
+            .iter()
+            .position(|b| block_id.verify_binding(&Serialization::serialize(&b.block)));
+        // .take_while(|b| !block_id.verify_binding(&Serialization::serialize(&b.block))).collect();
+        let blocks: Vec<_> = self
+            .blocks
+            .clone()
+            .into_iter()
+            .take(position.unwrap() + 1)
+            .collect();
+        Some(Self { blocks })
+    }
+
     fn current_rules(&self) -> Result<Option<C>> {
         Ok(self.get_last_block().map(|block| block.rules.clone()))
     }
@@ -75,29 +91,47 @@ where
     }
 }
 
-// #[cfg(test)]
-// pub mod test {
-//     use keri::prefix::SelfSigningPrefix;
-//     use said::prefix::SelfAddressingPrefix;
+#[cfg(test)]
+pub mod test {
+    use keri::prefix::SelfSigningPrefix;
+    use said::prefix::SelfAddressingPrefix;
 
-//     use crate::{
-//         controling_identifiers::Rules, microledger::MicroLedger, seal_provider::SealsAttachement,
-//         seals::AttachmentSeal,
-//     };
+    use crate::{
+        controling_identifiers::Rules, microledger::MicroLedger, seal_provider::SealsAttachement,
+        seals::AttachmentSeal, Serialization,
+    };
 
-//     #[test]
-//     fn test_microledger_deserialization() {
-//         type MicroledgerExample = MicroLedger<
-//             AttachmentSeal,
-//             SelfAddressingPrefix,
-//             Rules,
-//             SelfSigningPrefix,
-//             SealsAttachement,
-//         >;
+    #[test]
+    fn test_microledger_traversing() {
+        type MicroledgerExample = MicroLedger<
+            AttachmentSeal,
+            SelfAddressingPrefix,
+            Rules,
+            SelfSigningPrefix,
+            SealsAttachement,
+        >;
 
-//         let serialized_microledger = r#"{"blocks":[{"bl":{"seals":["ELw56P7ccBSkFj-THMErcH7RFX2Ph1fDUfQ1ErEmDuD4"],"previous":null,"rules":{"public_keys":["DNMchIYJM4PJim29UD5FMNtoKmWNFd6MX0Y2yXj2sfPY"]}},"si":["0Bypyj6RJaj-TkFD0hy4894ijV9ECxFhxWijqY1lB1Eya_Cp-Au1903ZN8f6BA98FuHW7tJNsMI_ihb5vgTFj-Aw"],"at":{"seals":{"ELw56P7ccBSkFj-THMErcH7RFX2Ph1fDUfQ1ErEmDuD4":"some message"}}},{"bl":{"seals":["EkmxFLOdaFuSibYsu6lSmab8RnIUKxjYoI6dzVawLx6g"],"previous":"EvcWUIdjA2xqEGNzf4NMNgZSPNS-C1x80aae20t_EdK0","rules":{"public_keys":["Dp-HXh0oSCldjgbYO29hYrd0R2BJYjgwrNxsJRY_ABPs"]}},"si":["0B83IzQY_CS2jdzC3Ymj3u6PO0vTmk34r4aYzIELUr5B0XAT_Z2qlkVFn0WYYGqLY6xsPl9xl1GQwGEtosx1JNBA"],"at":{"seals":{"EkmxFLOdaFuSibYsu6lSmab8RnIUKxjYoI6dzVawLx6g":"another message"}}}]}"#;
-//         let deserialize_microledger: MicroledgerExample =
-//             serde_json::from_str(&serialized_microledger).unwrap();
-//         assert_eq!(2, deserialize_microledger.blocks.len());
-//     }
-// }
+        let serialized_microledger = r#"{"blocks":[{"bl":{"seals":["ELw56P7ccBSkFj-THMErcH7RFX2Ph1fDUfQ1ErEmDuD4"],"previous":null,"rules":{"public_keys":["Dxd_pOfWnt5vqsj-VLym6wuHxxex9Z4wazIZMXyVbZBY"]}},"si":["0BGCml-d3bm6WlgRFE3_gND3556YgZsZsuh5OfSH5qge95G8R0zxSVjuCAygVa-Ta2VZrA4lZ7pNTDz5vozE3oDw"],"at":{"seals":{"ELw56P7ccBSkFj-THMErcH7RFX2Ph1fDUfQ1ErEmDuD4":"some message"}}},{"bl":{"seals":["E6AVF6hEJH0NS-bTZvfKac9EIDXfmpVSTzvzyKGGmn9I"],"previous":"EgFkVDi4saiPwwCfuxw6XlFafQ4RKdPSoC_hLSgygq24","rules":{"public_keys":["DRvBjYO4-wuK7mCpntD4Su7yBNqP3W30YUAiV1aQffyo"]}},"si":["0BWbx_bPAMLcw85l5Ksv3llp8h5vtIdDC7r2umwkKxV5McqJk2XHqKTaYNlfRchkIr4KozWGz8LVLw4AzD4EHdDQ"],"at":{"seals":{"E6AVF6hEJH0NS-bTZvfKac9EIDXfmpVSTzvzyKGGmn9I":"one more message"}}},{"bl":{"seals":["E6AVF6hEJH0NS-bTZvfKac9EIDXfmpVSTzvzyKGGmn9I"],"previous":"E8Kfq3CHZe0gL6wUBQ9JJ7FOGBchDgAd_DkiHBTbO2CQ","rules":{"public_keys":["DRvBjYO4-wuK7mCpntD4Su7yBNqP3W30YUAiV1aQffyo"]}},"si":["0BUmW5US8JPox7b-yaKPuc5xxS_ouy63lyfFc2fgBwyLWYpKSvO7KUJUirqfgefUx8igqLJANKcsJQmTvBdwfGAw"],"at":{"seals":{"E6AVF6hEJH0NS-bTZvfKac9EIDXfmpVSTzvzyKGGmn9I":"one more message"}}}]}"#;
+        let deserialize_microledger: MicroledgerExample =
+            serde_json::from_str(&serialized_microledger).unwrap();
+        assert_eq!(3, deserialize_microledger.blocks.len());
+
+        let second_block_id: SelfAddressingPrefix = "E8Kfq3CHZe0gL6wUBQ9JJ7FOGBchDgAd_DkiHBTbO2CQ"
+            .parse()
+            .unwrap();
+
+        // test `at` function
+        let at_micro = deserialize_microledger.at(second_block_id).unwrap();
+        assert_eq!(at_micro.blocks.len(), 2);
+
+        // test `get_last_block`
+        let last = deserialize_microledger.get_last_block();
+        let sed_last = r#"{"seals":["E6AVF6hEJH0NS-bTZvfKac9EIDXfmpVSTzvzyKGGmn9I"],"previous":"E8Kfq3CHZe0gL6wUBQ9JJ7FOGBchDgAd_DkiHBTbO2CQ","rules":{"public_keys":["DRvBjYO4-wuK7mCpntD4Su7yBNqP3W30YUAiV1aQffyo"]}}"#;
+        assert_eq!(serde_json::to_string(&last.unwrap()).unwrap(), sed_last);
+
+        assert_ne!(
+            last.unwrap().serialize(),
+            at_micro.get_last_block().unwrap().serialize()
+        );
+    }
+}

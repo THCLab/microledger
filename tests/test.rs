@@ -74,7 +74,7 @@ fn test() -> Result<(), Error> {
 
     // Try to add concurent block.
     let payload = "one more message";
-    let (nnpk, nnsk) = generate_key_pair();
+    let (nnpk, _nnsk) = generate_key_pair();
     let rules = Rules::new(vec![nnpk.key()]);
 
     let mut block2 = microledger.pre_anchor_block(vec![], rules);
@@ -86,6 +86,7 @@ fn test() -> Result<(), Error> {
     let microledger1 = microledger.anchor(signed_block2)?;
 
     assert_eq!(2, microledger1.blocks.len());
+    assert_eq!(1, microledger.blocks.len());
 
     Ok(())
 }

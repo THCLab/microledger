@@ -28,7 +28,6 @@ impl Serialize for AttachmentSeal {
     }
 }
 
-
 impl<'de> Deserialize<'de> for AttachmentSeal {
     fn deserialize<D>(deserializer: D) -> Result<AttachmentSeal, D::Error>
     where
@@ -37,10 +36,9 @@ impl<'de> Deserialize<'de> for AttachmentSeal {
         let s = String::deserialize(deserializer)?;
         let sai = s.parse().map_err(serde::de::Error::custom)?;
 
-        Ok(AttachmentSeal {sai})
+        Ok(AttachmentSeal { sai })
     }
 }
-
 
 impl Seal for AttachmentSeal {
     fn to_str(&self) -> String {
