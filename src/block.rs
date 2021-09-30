@@ -1,9 +1,14 @@
 use serde::{Deserialize, Serialize};
 
 use crate::{
-    controling_identifiers::ControlingIdentifier, digital_fingerprint::DigitalFingerprint,
-    error::Error, microledger::Result, seal_provider::SealProvider, seals::Seal,
-    signature::Signature, Serialization,
+    controling_identifiers::ControlingIdentifier,
+    digital_fingerprint::DigitalFingerprint,
+    error::Error,
+    microledger::Result,
+    seal_provider::{SealProvider, SealsAttachement},
+    seals::Seal,
+    signature::Signature,
+    Serialization,
 };
 
 #[derive(Clone, Serialize, Deserialize)]
@@ -16,6 +21,8 @@ where
     pub seals: Vec<I>,
     pub previous: Option<D>,
     pub rules: C,
+    #[serde(skip_serializing)]
+    attachements: Option<SealsAttachement>,
 }
 
 impl<I, D, C> Serialization for Block<I, D, C>
@@ -40,18 +47,30 @@ where
             seals,
             previous,
             rules,
+            attachements: None,
         }
     }
 
-    pub fn to_signed_block<S: Signature + Serialize, P: SealProvider + Serialize>(
+    pub fn attach(&mut self, data: &[u8]) -> Result<()> {
+        let mut attachements = self.attachements.clone().unwrap_or(SealsAttachement::new());
+        let seal: I = attachements.save(data).unwrap();
+        self.seals.push(seal);
+        self.attachements = Some(attachements);
+
+        Ok(())
+    }
+
+    pub fn to_signed_block<S: Signature + Serialize>(
         self,
         signatures: Vec<S>,
-        attachements: P,
-    ) -> SignedBlock<I, C, D, S, P> {
+        // attachements: P,
+    ) -> SignedBlock<I, C, D, S, SealsAttachement> {
+        // TODO remove expect
+        let attachement = self.attachements.clone().expect("Empty seal provider");
         SignedBlock {
             block: self,
             signatures,
-            attached_seal: attachements,
+            attached_seal: attachement,
         }
     }
 }
@@ -80,13 +99,14 @@ where
     C: ControlingIdentifier + Serialize + Clone,
     D: DigitalFingerprint + Serialize,
     S: Signature + Serialize,
-    P: SealProvider + Serialize,
+    P: SealProvider + Clone,
 {
     #[serde(rename = "bl")]
     pub block: Block<I, D, C>,
     #[serde(rename = "si")]
     pub signatures: Vec<S>,
     #[serde(rename = "at")]
+    // should be vec in the future
     pub attached_seal: P,
 }
 
@@ -97,7 +117,7 @@ where
     C: ControlingIdentifier + Serialize + Clone,
     D: DigitalFingerprint + Serialize,
     S: Signature + Serialize,
-    P: SealProvider + Serialize,
+    P: SealProvider + Clone,
     S: Signature,
 {
     pub fn verify(&self, rules: Option<C>) -> Result<bool> {
@@ -112,7 +132,12 @@ where
 
     fn check_seals(&self) -> Result<bool> {
         // check if seal of given hash exists in provider
-        if self.block.seals.iter().all(|s| self.attached_seal.check(s)) {
+        if self
+            .block
+            .seals
+            .iter()
+            .all(|s| self.attached_seal.clone().check(s))
+        {
             Ok(true)
         } else {
             Err(Error::BlockError(
@@ -127,22 +152,24 @@ pub mod test {
     use rand::rngs::OsRng;
     use said::{derivation::SelfAddressing, prefix::SelfAddressingPrefix};
 
-    use crate::{block::Block, controling_identifiers::Rules, Serialization};
+    use crate::{
+        block::Block, controling_identifiers::Rules, seals::AttachmentSeal, Serialization,
+    };
     #[test]
     fn test_block_serialization() {
+        type BlockExample = Block<AttachmentSeal, SelfAddressingPrefix, Rules>;
         // generate keypair
         let kp = ed25519_dalek::Keypair::generate(&mut OsRng {});
         let (pk, _sk) = (kp.public.to_bytes().to_vec(), kp.secret);
 
-        let seal = SelfAddressing::Blake3_256.derive("exmaple".as_bytes());
+        let seal = AttachmentSeal::new("example".as_bytes()); // SelfAddressing::Blake3_256.derive("exmaple".as_bytes());
         let prev: Option<SelfAddressingPrefix> =
             Some(SelfAddressing::Blake3_256.derive("exmaple".as_bytes()));
         let rules = Rules::new(vec![pk]);
-        let block = Block::new(vec![seal], prev, rules);
+        let block: BlockExample = Block::new(vec![seal], prev, rules);
         println!("{}", String::from_utf8(block.serialize()).unwrap());
 
-        let deserialized_block: Block<SelfAddressingPrefix, SelfAddressingPrefix, Rules> =
-            serde_json::from_slice(&block.serialize()).unwrap();
+        let deserialized_block: BlockExample = serde_json::from_slice(&block.serialize()).unwrap();
         assert_eq!(block.serialize(), deserialized_block.serialize());
     }
 }

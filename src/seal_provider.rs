@@ -32,9 +32,10 @@ impl SealsAttachement {
     }
 
     /// Saves data in attachement and return hash used as a key.
-    pub fn save<S: Seal>(&mut self, data: &str) -> Option<S> {
-        let seal = S::derive(data.as_bytes());
-        self.seals.insert(seal.to_str(), data.to_string());
+    pub fn save<S: Seal>(&mut self, data: &[u8]) -> Option<S> {
+        let seal = S::derive(data);
+        self.seals
+            .insert(seal.to_str(), String::from_utf8(data.to_vec()).unwrap());
         Some(seal)
     }
 }
