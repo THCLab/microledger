@@ -28,10 +28,10 @@ where
 impl<I, D, C, P, S> MicroLedger<I, D, C, S, P>
 where
     I: Seal + Serialize + Clone,
-    D: DigitalFingerprint + Serialize,
+    D: DigitalFingerprint + Serialize + Clone,
     C: ControlingIdentifier + Serialize + Clone,
-    P: SealProvider + Serialize,
-    S: Signature + Serialize,
+    P: SealProvider + Serialize + Clone,
+    S: Signature + Serialize + Clone,
 {
     pub fn new() -> Self {
         MicroLedger { blocks: vec![] }
@@ -61,12 +61,13 @@ where
         Ok(self.get_last_block().map(|block| block.rules.clone()))
     }
 
-    pub fn anchor(&mut self, block: SignedBlock<I, C, D, S, P>) -> Result<()> {
+pub fn anchor(&self, block: SignedBlock<I, C, D, S, P>) -> Result<Self> {
         let last = self.get_last_block();
         // Checks block binding and signatures.
         if block.check_block(last)? && block.verify(self.current_rules()?)? {
-            self.blocks.push(block);
-            Ok(())
+            let mut blocks = self.blocks.clone();
+            blocks.push(block);
+            Ok(MicroLedger {blocks: blocks.to_vec()})
         } else {
             Err(Error::MicroError("Wrong block".into()))
         }

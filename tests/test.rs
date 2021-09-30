@@ -45,7 +45,7 @@ fn test() -> Result<(), Error> {
     let signed_block = block.to_signed_block(vec![s], provider);
 
     // Attach block to microledger.
-    microledger.anchor(signed_block)?;
+    microledger =  microledger.anchor(signed_block)?;
     assert_eq!(1, microledger.blocks.len());
 
     // Prepeare data for new block.
@@ -72,9 +72,25 @@ fn test() -> Result<(), Error> {
     let signature_raw = sk.sign_ed(&block1.serialize()).unwrap();
     let s = SelfSigning::Ed25519Sha512.derive(signature_raw);
     let signed_block1 = block1.to_signed_block(vec![s], provider);
-    microledger.anchor(signed_block1)?;
+    let microledger0 = microledger.anchor(signed_block1)?;
+    
+    assert_eq!(2, microledger0.blocks.len());
+    assert_eq!(1, microledger.blocks.len());
+    
+    // Try to add concurent block.
+    let payload = "one more message";
+    let mut provider = SealsAttachement::new();
+    let seal: SelfAddressingPrefix = provider.save(payload).unwrap();
+    let (nnpk, nnsk) = generate_key_pair();
+    let rules = Rules::new(vec![nnpk.key()]);
 
-    assert_eq!(2, microledger.blocks.len());
+    let block2 = microledger.pre_anchor_block(vec![seal.clone()], rules);
+    let signature_raw = sk.sign_ed(&block2.serialize()).unwrap();
+    let s = SelfSigning::Ed25519Sha512.derive(signature_raw);
+    let signed_block2 = block2.to_signed_block(vec![s], provider);
+    let microledger1 = microledger.anchor(signed_block2)?;
+
+    assert_eq!(2, microledger1.blocks.len());
 
     Ok(())
 }
