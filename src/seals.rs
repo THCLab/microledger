@@ -6,7 +6,7 @@ pub trait Seal {
     fn derive(data: &[u8]) -> Self;
 }
 
-#[derive(Clone)]
+#[derive(Clone, PartialEq, Debug)]
 pub struct AttachmentSeal {
     sai: SelfAddressingPrefix,
 }

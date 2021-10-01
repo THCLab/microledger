@@ -11,7 +11,7 @@ use crate::{
     Serialization,
 };
 
-#[derive(Clone, Serialize, Deserialize)]
+#[derive(Clone, Serialize, Deserialize, PartialEq, Debug)]
 pub struct Block<I, D, C>
 where
     I: Seal,
@@ -106,7 +106,7 @@ where
     #[serde(rename = "si")]
     pub signatures: Vec<S>,
     #[serde(rename = "at")]
-    // should be vec in the future
+    // TODO should be vec in the future
     pub attached_seal: P,
 }
 

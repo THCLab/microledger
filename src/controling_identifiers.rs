@@ -12,7 +12,7 @@ pub trait ControlingIdentifier {
     fn check_signatures<S: Signature>(&self, msg: &[u8], signatures: &[S]) -> Result<bool, Error>;
 }
 
-#[derive(Serialize, Deserialize, Clone)]
+#[derive(Serialize, Deserialize, Clone, PartialEq, Debug)]
 pub struct Rules {
     public_keys: Vec<BasicPrefix>,
 }

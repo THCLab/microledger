@@ -1,3 +1,4 @@
+use said::prefix::SelfAddressingPrefix;
 use serde::{Deserialize, Serialize};
 
 use crate::error::Error;
@@ -22,6 +23,7 @@ where
     S: Signature + Serialize,
     P: SealProvider + Serialize + Clone,
 {
+    #[serde(rename = "bs")]
     pub blocks: Vec<SignedBlock<I, C, D, S, P>>,
 }
 
@@ -52,11 +54,26 @@ where
         Block::new(attachements, prev, rules)
     }
 
+    pub fn anchor(&self, block: SignedBlock<I, C, D, S, P>) -> Result<Self> {
+        let last = self.get_last_block();
+        // Checks block binding and signatures.
+        if block.check_block(last)? && block.verify(self.current_rules()?)? {
+            let mut blocks = self.blocks.clone();
+            blocks.push(block);
+            Ok(MicroLedger {
+                blocks: blocks.to_vec(),
+            })
+        } else {
+            Err(Error::MicroError("Wrong block".into()))
+        }
+    }
+
     fn get_last_block(&self) -> Option<&Block<I, D, C>> {
         self.blocks.last().map(|last| &last.block)
     }
 
-    fn at(&self, block_id: D) -> Option<Self> {
+    /// Returns copy of sub-microledger which last block matches the given fingerprint.
+    fn at(&self, block_id: &D) -> Option<Self> {
         let position = self
             .blocks
             .clone()
@@ -76,18 +93,33 @@ where
         Ok(self.get_last_block().map(|block| block.rules.clone()))
     }
 
-    pub fn anchor(&self, block: SignedBlock<I, C, D, S, P>) -> Result<Self> {
-        let last = self.get_last_block();
-        // Checks block binding and signatures.
-        if block.check_block(last)? && block.verify(self.current_rules()?)? {
-            let mut blocks = self.blocks.clone();
-            blocks.push(block);
-            Ok(MicroLedger {
-                blocks: blocks.to_vec(),
-            })
-        } else {
-            Err(Error::MicroError("Wrong block".into()))
-        }
+    /// Returns block of given fingerprint
+    pub fn get_block(&self, fingerprint: &SelfAddressingPrefix) -> Result<Block<I, D, C>> {
+        self.blocks
+            .iter()
+            .find(|b| fingerprint.verify_binding(&Serialization::serialize(&b.block)))
+            .map(|b| b.block.clone())
+            .ok_or_else(|| Error::MicroError("No block of given fingerprint".into()))
+    }
+
+    fn get_block_provider(
+        &self,
+        fingerprint: &SelfAddressingPrefix,
+    ) -> Result<(Block<I, D, C>, P)> {
+        self.blocks
+            .iter()
+            .find(|b| fingerprint.verify_binding(&Serialization::serialize(&b.block)))
+            .map(|b| (b.block.clone(), b.attached_seal.clone()))
+            .ok_or_else(|| Error::MicroError("No block of given fingerprint".into()))
+    }
+
+    pub fn get_seal_datums(&self, fingerprint: &SelfAddressingPrefix) -> Result<Vec<String>> {
+        let (block, provider) = self.get_block_provider(fingerprint)?;
+        Ok(block
+            .seals
+            .iter()
+            .map(|s| provider.get(s).unwrap())
+            .collect())
     }
 }
 
@@ -97,8 +129,8 @@ pub mod test {
     use said::prefix::SelfAddressingPrefix;
 
     use crate::{
-        controling_identifiers::Rules, microledger::MicroLedger, seal_provider::SealsAttachement,
-        seals::AttachmentSeal, Serialization,
+        block::Block, controling_identifiers::Rules, microledger::MicroLedger,
+        seal_provider::SealsAttachement, seals::AttachmentSeal,
     };
 
     #[test]
@@ -111,7 +143,9 @@ pub mod test {
             SealsAttachement,
         >;
 
-        let serialized_microledger = r#"{"blocks":[{"bl":{"seals":["ELw56P7ccBSkFj-THMErcH7RFX2Ph1fDUfQ1ErEmDuD4"],"previous":null,"rules":{"public_keys":["Dxd_pOfWnt5vqsj-VLym6wuHxxex9Z4wazIZMXyVbZBY"]}},"si":["0BGCml-d3bm6WlgRFE3_gND3556YgZsZsuh5OfSH5qge95G8R0zxSVjuCAygVa-Ta2VZrA4lZ7pNTDz5vozE3oDw"],"at":{"seals":{"ELw56P7ccBSkFj-THMErcH7RFX2Ph1fDUfQ1ErEmDuD4":"some message"}}},{"bl":{"seals":["E6AVF6hEJH0NS-bTZvfKac9EIDXfmpVSTzvzyKGGmn9I"],"previous":"EgFkVDi4saiPwwCfuxw6XlFafQ4RKdPSoC_hLSgygq24","rules":{"public_keys":["DRvBjYO4-wuK7mCpntD4Su7yBNqP3W30YUAiV1aQffyo"]}},"si":["0BWbx_bPAMLcw85l5Ksv3llp8h5vtIdDC7r2umwkKxV5McqJk2XHqKTaYNlfRchkIr4KozWGz8LVLw4AzD4EHdDQ"],"at":{"seals":{"E6AVF6hEJH0NS-bTZvfKac9EIDXfmpVSTzvzyKGGmn9I":"one more message"}}},{"bl":{"seals":["E6AVF6hEJH0NS-bTZvfKac9EIDXfmpVSTzvzyKGGmn9I"],"previous":"E8Kfq3CHZe0gL6wUBQ9JJ7FOGBchDgAd_DkiHBTbO2CQ","rules":{"public_keys":["DRvBjYO4-wuK7mCpntD4Su7yBNqP3W30YUAiV1aQffyo"]}},"si":["0BUmW5US8JPox7b-yaKPuc5xxS_ouy63lyfFc2fgBwyLWYpKSvO7KUJUirqfgefUx8igqLJANKcsJQmTvBdwfGAw"],"at":{"seals":{"E6AVF6hEJH0NS-bTZvfKac9EIDXfmpVSTzvzyKGGmn9I":"one more message"}}}]}"#;
+        type BlockType = Block<AttachmentSeal, SelfAddressingPrefix, Rules>;
+
+        let serialized_microledger = r#"{"bs":[{"bl":{"seals":["ELw56P7ccBSkFj-THMErcH7RFX2Ph1fDUfQ1ErEmDuD4"],"previous":null,"rules":{"public_keys":["Dxd_pOfWnt5vqsj-VLym6wuHxxex9Z4wazIZMXyVbZBY"]}},"si":["0BGCml-d3bm6WlgRFE3_gND3556YgZsZsuh5OfSH5qge95G8R0zxSVjuCAygVa-Ta2VZrA4lZ7pNTDz5vozE3oDw"],"at":{"seals":{"ELw56P7ccBSkFj-THMErcH7RFX2Ph1fDUfQ1ErEmDuD4":"some message"}}},{"bl":{"seals":["E6AVF6hEJH0NS-bTZvfKac9EIDXfmpVSTzvzyKGGmn9I"],"previous":"EgFkVDi4saiPwwCfuxw6XlFafQ4RKdPSoC_hLSgygq24","rules":{"public_keys":["DRvBjYO4-wuK7mCpntD4Su7yBNqP3W30YUAiV1aQffyo"]}},"si":["0BWbx_bPAMLcw85l5Ksv3llp8h5vtIdDC7r2umwkKxV5McqJk2XHqKTaYNlfRchkIr4KozWGz8LVLw4AzD4EHdDQ"],"at":{"seals":{"E6AVF6hEJH0NS-bTZvfKac9EIDXfmpVSTzvzyKGGmn9I":"one more message"}}},{"bl":{"seals":["E6AVF6hEJH0NS-bTZvfKac9EIDXfmpVSTzvzyKGGmn9I"],"previous":"E8Kfq3CHZe0gL6wUBQ9JJ7FOGBchDgAd_DkiHBTbO2CQ","rules":{"public_keys":["DRvBjYO4-wuK7mCpntD4Su7yBNqP3W30YUAiV1aQffyo"]}},"si":["0BUmW5US8JPox7b-yaKPuc5xxS_ouy63lyfFc2fgBwyLWYpKSvO7KUJUirqfgefUx8igqLJANKcsJQmTvBdwfGAw"],"at":{"seals":{"E6AVF6hEJH0NS-bTZvfKac9EIDXfmpVSTzvzyKGGmn9I":"one more message"}}}]}"#;
         let deserialize_microledger: MicroledgerExample =
             serde_json::from_str(&serialized_microledger).unwrap();
         assert_eq!(3, deserialize_microledger.blocks.len());
@@ -121,17 +155,22 @@ pub mod test {
             .unwrap();
 
         // test `at` function
-        let at_micro = deserialize_microledger.at(second_block_id).unwrap();
+        let at_micro = deserialize_microledger.at(&second_block_id).unwrap();
         assert_eq!(at_micro.blocks.len(), 2);
 
         // test `get_last_block`
-        let last = deserialize_microledger.get_last_block();
+        let last = deserialize_microledger.get_last_block().unwrap().clone();
         let sed_last = r#"{"seals":["E6AVF6hEJH0NS-bTZvfKac9EIDXfmpVSTzvzyKGGmn9I"],"previous":"E8Kfq3CHZe0gL6wUBQ9JJ7FOGBchDgAd_DkiHBTbO2CQ","rules":{"public_keys":["DRvBjYO4-wuK7mCpntD4Su7yBNqP3W30YUAiV1aQffyo"]}}"#;
-        assert_eq!(serde_json::to_string(&last.unwrap()).unwrap(), sed_last);
+        let block: BlockType = serde_json::from_str(sed_last).unwrap();
+        assert_eq!(last, block);
 
-        assert_ne!(
-            last.unwrap().serialize(),
-            at_micro.get_last_block().unwrap().serialize()
-        );
+        assert_ne!(last, at_micro.get_last_block().unwrap().to_owned());
+
+        // test `get_seals_datum`
+        let seals = deserialize_microledger
+            .get_seal_datums(&second_block_id)
+            .unwrap();
+        assert_eq!(seals.len(), 1);
+        assert_eq!(seals[0], "one more message");
     }
 }
