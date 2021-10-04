@@ -4,16 +4,19 @@ use serde::{Deserialize, Deserializer, Serialize, Serializer};
 pub trait Seal {
     fn to_str(&self) -> String;
     fn derive(data: &[u8]) -> Self;
+    fn get_attachement(&self) -> Option<String>;
 }
 
 #[derive(Clone, PartialEq, Debug)]
 pub struct AttachmentSeal {
+    data: Option<String>,
     sai: SelfAddressingPrefix,
 }
 
 impl AttachmentSeal {
     pub fn new(data: &[u8]) -> Self {
         Self {
+            data: Some(String::from_utf8(data.to_vec()).unwrap()),
             sai: SelfAddressing::Blake3_256.derive(data),
         }
     }
@@ -36,7 +39,7 @@ impl<'de> Deserialize<'de> for AttachmentSeal {
         let s = String::deserialize(deserializer)?;
         let sai = s.parse().map_err(serde::de::Error::custom)?;
 
-        Ok(AttachmentSeal { sai })
+        Ok(AttachmentSeal { data: None, sai })
     }
 }
 
@@ -46,8 +49,10 @@ impl Seal for AttachmentSeal {
     }
 
     fn derive(data: &[u8]) -> Self {
-        Self {
-            sai: SelfAddressing::Blake3_256.derive(data),
-        }
+        Self::new(data)
+    }
+
+    fn get_attachement(&self) -> Option<String> {
+        self.data.clone()
     }
 }

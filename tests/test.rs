@@ -34,8 +34,8 @@ fn test() -> Result<(), Error> {
     let payload = "some message";
     let bp = Basic::Ed25519.derive(pk);
 
-    let mut block = microledger.pre_anchor_block(vec![], vec![bp]);
-    block.attach(payload.as_bytes())?;
+    let block =
+        microledger.pre_anchor_block(vec![AttachmentSeal::new(payload.as_bytes())], vec![bp]);
 
     // Sign block, attach signature and seal provider.
     let signature_raw = sk.sign_ed(&block.serialize()).unwrap();
@@ -51,8 +51,10 @@ fn test() -> Result<(), Error> {
     let (npk, _nsk) = generate_key_pair();
     let nbp = Basic::Ed25519.derive(npk);
 
-    let mut block0 = microledger.pre_anchor_block(vec![], vec![nbp.clone()]);
-    block0.attach(payload.as_bytes())?;
+    let block0 = microledger.pre_anchor_block(
+        vec![AttachmentSeal::new(payload.as_bytes())],
+        vec![nbp.clone()],
+    );
 
     // try to append block with wrong signature
     let (_wrong_pk, wrong_sk) = generate_key_pair();
@@ -65,8 +67,8 @@ fn test() -> Result<(), Error> {
     assert_eq!(1, microledger.blocks.len());
 
     // Now sign block the same block with proper keys and append it.
-    let mut block1 = microledger.pre_anchor_block(vec![], vec![nbp]);
-    block1.attach(payload.as_bytes())?;
+    let block1 =
+        microledger.pre_anchor_block(vec![AttachmentSeal::new(payload.as_bytes())], vec![nbp]);
 
     let signature_raw = sk.sign_ed(&block1.serialize()).unwrap();
     let s = SelfSigning::Ed25519Sha512.derive(signature_raw);
@@ -81,8 +83,8 @@ fn test() -> Result<(), Error> {
     let (nnpk, nnsk) = generate_key_pair();
     let nnbp = Basic::Ed25519.derive(nnpk);
 
-    let mut block2 = microledger.pre_anchor_block(vec![], vec![nnbp]);
-    block2.attach(payload.as_bytes())?;
+    let block2 =
+        microledger.pre_anchor_block(vec![AttachmentSeal::new(payload.as_bytes())], vec![nnbp]);
 
     let signature_raw = sk.sign_ed(&block2.serialize()).unwrap();
     let s = SelfSigning::Ed25519Sha512.derive(signature_raw);
@@ -96,8 +98,8 @@ fn test() -> Result<(), Error> {
     let (nnpk, _nnsk) = generate_key_pair();
     let nnbp = Basic::Ed25519.derive(nnpk);
 
-    let mut block3 = microledger1.pre_anchor_block(vec![], vec![nnbp]);
-    block3.attach(payload.as_bytes())?;
+    let block3 =
+        microledger1.pre_anchor_block(vec![AttachmentSeal::new(payload.as_bytes())], vec![nnbp]);
 
     let signature_raw = nnsk.sign_ed(&block3.serialize()).unwrap();
     let s = SelfSigning::Ed25519Sha512.derive(signature_raw);

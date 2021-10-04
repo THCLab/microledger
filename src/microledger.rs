@@ -55,7 +55,13 @@ where
             .last()
             .map(|sb| D::derive(&Serialization::serialize(&sb.block)));
 
-        Block::new(attachements, prev, controlling_identifiers)
+        let mut block = Block::new(vec![], prev, controlling_identifiers);
+        attachements.iter().for_each(|at| {
+            if let Some(data) = at.get_attachement() {
+                block.attach(data.as_bytes()).unwrap();
+            }
+        });
+        block
     }
 
     pub fn anchor(&self, block: SignedBlock<I, C, D, S, P>) -> Result<Self> {
