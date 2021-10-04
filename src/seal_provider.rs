@@ -11,6 +11,7 @@ pub trait SealProvider {
 
 #[derive(Serialize, Clone, Deserialize, Default, PartialEq, Debug)]
 pub struct SealsAttachement {
+    #[serde(flatten)]
     seals: HashMap<String, String>,
 }
 

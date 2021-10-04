@@ -18,9 +18,12 @@ where
     D: DigitalFingerprint,
     C: ControlingIdentifier + Clone,
 {
+    #[serde(rename = "s")]
     pub seals: Vec<I>,
+    #[serde(rename = "p", skip_serializing_if = "Option::is_none")]
     pub previous: Option<D>,
-    pub rules: C,
+    #[serde(rename = "ci")]
+    pub controlling_identifiers: Vec<C>,
     #[serde(skip_serializing)]
     attachements: Option<SealsAttachement>,
 }
@@ -42,11 +45,11 @@ where
     D: DigitalFingerprint + Serialize,
     C: ControlingIdentifier + Serialize + Clone,
 {
-    pub fn new(seals: Vec<I>, previous: Option<D>, rules: C) -> Self {
+    pub fn new(seals: Vec<I>, previous: Option<D>, controlling_identifiers: Vec<C>) -> Self {
         Self {
             seals,
             previous,
-            rules,
+            controlling_identifiers,
             attachements: None,
         }
     }
@@ -105,8 +108,8 @@ where
     pub block: Block<I, D, C>,
     #[serde(rename = "si")]
     pub signatures: Vec<S>,
-    #[serde(rename = "at")]
     // TODO should be vec in the future
+    #[serde(rename = "at")]
     pub attached_seal: P,
 }
 
@@ -120,10 +123,14 @@ where
     P: SealProvider + Clone,
     S: Signature,
 {
-    pub fn verify(&self, rules: Option<C>) -> Result<bool> {
-        rules
-            .unwrap_or_else(|| self.block.rules.clone())
-            .check_signatures(&Serialization::serialize(&self.block), &self.signatures)
+    pub fn verify(&self, controlling_identifiers: Option<Vec<C>>) -> Result<bool> {
+        Ok(controlling_identifiers
+            .unwrap_or_else(|| self.block.controlling_identifiers.clone())
+            .iter()
+            .all(|ci| {
+                ci.check_signatures(&Serialization::serialize(&self.block), &self.signatures)
+                    .unwrap()
+            }))
     }
 
     pub fn check_block(&self, block: Option<&Block<I, D, C>>) -> Result<bool> {
@@ -149,24 +156,23 @@ where
 
 #[cfg(test)]
 pub mod test {
+    use keri::{derivation::basic::Basic, keys::PublicKey, prefix::BasicPrefix};
     use rand::rngs::OsRng;
     use said::{derivation::SelfAddressing, prefix::SelfAddressingPrefix};
 
-    use crate::{
-        block::Block, controling_identifiers::Rules, seals::AttachmentSeal, Serialization,
-    };
+    use crate::{block::Block, seals::AttachmentSeal, Serialization};
     #[test]
     fn test_block_serialization() {
-        type BlockExample = Block<AttachmentSeal, SelfAddressingPrefix, Rules>;
+        type BlockExample = Block<AttachmentSeal, SelfAddressingPrefix, BasicPrefix>;
         // generate keypair
         let kp = ed25519_dalek::Keypair::generate(&mut OsRng {});
-        let (pk, _sk) = (kp.public.to_bytes().to_vec(), kp.secret);
+        let (pk, _sk) = (kp.public, kp.secret);
+        let bp = Basic::Ed25519.derive(PublicKey::new(pk.as_bytes().to_vec()));
 
         let seal = AttachmentSeal::new("example".as_bytes()); // SelfAddressing::Blake3_256.derive("exmaple".as_bytes());
         let prev: Option<SelfAddressingPrefix> =
             Some(SelfAddressing::Blake3_256.derive("exmaple".as_bytes()));
-        let rules = Rules::new(vec![pk]);
-        let block: BlockExample = Block::new(vec![seal], prev, rules);
+        let block: BlockExample = Block::new(vec![seal], prev, vec![bp]);
         println!("{}", String::from_utf8(block.serialize()).unwrap());
 
         let deserialized_block: BlockExample = serde_json::from_slice(&block.serialize()).unwrap();

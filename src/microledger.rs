@@ -39,7 +39,11 @@ where
         MicroLedger { blocks: vec![] }
     }
 
-    pub fn pre_anchor_block(&self, attachements: Vec<I>, rules: C) -> Block<I, D, C>
+    pub fn pre_anchor_block(
+        &self,
+        attachements: Vec<I>,
+        controlling_identifiers: Vec<C>,
+    ) -> Block<I, D, C>
     where
         I: Seal + Serialize + Clone,
         D: DigitalFingerprint + Serialize,
@@ -51,13 +55,13 @@ where
             .last()
             .map(|sb| D::derive(&Serialization::serialize(&sb.block)));
 
-        Block::new(attachements, prev, rules)
+        Block::new(attachements, prev, controlling_identifiers)
     }
 
     pub fn anchor(&self, block: SignedBlock<I, C, D, S, P>) -> Result<Self> {
         let last = self.get_last_block();
         // Checks block binding and signatures.
-        if block.check_block(last)? && block.verify(self.current_rules()?)? {
+        if block.check_block(last)? && block.verify(self.current_controlling_identifiers()?)? {
             let mut blocks = self.blocks.clone();
             blocks.push(block);
             Ok(MicroLedger {
@@ -89,8 +93,10 @@ where
         Some(Self { blocks })
     }
 
-    fn current_rules(&self) -> Result<Option<C>> {
-        Ok(self.get_last_block().map(|block| block.rules.clone()))
+    fn current_controlling_identifiers(&self) -> Result<Option<Vec<C>>> {
+        Ok(self
+            .get_last_block()
+            .map(|block| block.controlling_identifiers.clone()))
     }
 
     /// Returns block of given fingerprint
@@ -125,12 +131,12 @@ where
 
 #[cfg(test)]
 pub mod test {
-    use keri::prefix::SelfSigningPrefix;
+    use keri::prefix::{BasicPrefix, SelfSigningPrefix};
     use said::prefix::SelfAddressingPrefix;
 
     use crate::{
-        block::Block, controling_identifiers::Rules, microledger::MicroLedger,
-        seal_provider::SealsAttachement, seals::AttachmentSeal,
+        block::Block, microledger::MicroLedger, seal_provider::SealsAttachement,
+        seals::AttachmentSeal,
     };
 
     #[test]
@@ -138,19 +144,19 @@ pub mod test {
         type MicroledgerExample = MicroLedger<
             AttachmentSeal,
             SelfAddressingPrefix,
-            Rules,
+            BasicPrefix,
             SelfSigningPrefix,
             SealsAttachement,
         >;
 
-        type BlockType = Block<AttachmentSeal, SelfAddressingPrefix, Rules>;
+        type BlockType = Block<AttachmentSeal, SelfAddressingPrefix, BasicPrefix>;
 
-        let serialized_microledger = r#"{"bs":[{"bl":{"seals":["ELw56P7ccBSkFj-THMErcH7RFX2Ph1fDUfQ1ErEmDuD4"],"previous":null,"rules":{"public_keys":["Dxd_pOfWnt5vqsj-VLym6wuHxxex9Z4wazIZMXyVbZBY"]}},"si":["0BGCml-d3bm6WlgRFE3_gND3556YgZsZsuh5OfSH5qge95G8R0zxSVjuCAygVa-Ta2VZrA4lZ7pNTDz5vozE3oDw"],"at":{"seals":{"ELw56P7ccBSkFj-THMErcH7RFX2Ph1fDUfQ1ErEmDuD4":"some message"}}},{"bl":{"seals":["E6AVF6hEJH0NS-bTZvfKac9EIDXfmpVSTzvzyKGGmn9I"],"previous":"EgFkVDi4saiPwwCfuxw6XlFafQ4RKdPSoC_hLSgygq24","rules":{"public_keys":["DRvBjYO4-wuK7mCpntD4Su7yBNqP3W30YUAiV1aQffyo"]}},"si":["0BWbx_bPAMLcw85l5Ksv3llp8h5vtIdDC7r2umwkKxV5McqJk2XHqKTaYNlfRchkIr4KozWGz8LVLw4AzD4EHdDQ"],"at":{"seals":{"E6AVF6hEJH0NS-bTZvfKac9EIDXfmpVSTzvzyKGGmn9I":"one more message"}}},{"bl":{"seals":["E6AVF6hEJH0NS-bTZvfKac9EIDXfmpVSTzvzyKGGmn9I"],"previous":"E8Kfq3CHZe0gL6wUBQ9JJ7FOGBchDgAd_DkiHBTbO2CQ","rules":{"public_keys":["DRvBjYO4-wuK7mCpntD4Su7yBNqP3W30YUAiV1aQffyo"]}},"si":["0BUmW5US8JPox7b-yaKPuc5xxS_ouy63lyfFc2fgBwyLWYpKSvO7KUJUirqfgefUx8igqLJANKcsJQmTvBdwfGAw"],"at":{"seals":{"E6AVF6hEJH0NS-bTZvfKac9EIDXfmpVSTzvzyKGGmn9I":"one more message"}}}]}"#;
+        let serialized_microledger = r#"{"bs":[{"bl":{"s":["ELw56P7ccBSkFj-THMErcH7RFX2Ph1fDUfQ1ErEmDuD4"],"ci":["DHwi3fny5p1YTLVBh6sTFfGc6SVo0-WmqTBp8bRxftis"]},"si":["0Bcjzq7Fn2ObJeaY95TBv9_IBExN-9RxYWzbGcsW9wQDyvzQKaXhVts_5ZzxLzZCrBJm2RRkqDIJQym_h_NY_TAw"],"at":{"ELw56P7ccBSkFj-THMErcH7RFX2Ph1fDUfQ1ErEmDuD4":"some message"}},{"bl":{"s":["E6AVF6hEJH0NS-bTZvfKac9EIDXfmpVSTzvzyKGGmn9I"],"p":"E_j0QDlIx9jGOndGyZsamzGsTSIcRgXEPoFGkO4sGpXI","ci":["D4aYRwAOKukrceiJGMFw_x8cG__VWbJKsPSE95FfSGb8"]},"si":["0BaSVviL57qpKwd__u844J_-XgGjHZ3uxk9tB2FovH6KJId8BNvYop2jgOJb3ttJCasLE1DwYbxopyw8QmywOlAQ"],"at":{"E6AVF6hEJH0NS-bTZvfKac9EIDXfmpVSTzvzyKGGmn9I":"one more message"}},{"bl":{"s":["EJLZcnDF6gCZdODVgYOczNCluO3CkJa0yONOkXvXiVO8"],"p":"Er1nlzyvdg_aEC-jM8rsf5guXAA5HSkJ-cZQjJmejZV0","ci":["Dl0XOCM8-xCHuf9nFZllJmKCWoBZNy9gf6uopXxQLuho"]},"si":["0BZUlP9DaTbQK4sxFpa-M7uU9cPvqPd3geqH2WTHBVrJqJ8QIcd37Bf6jwp9JXesKkmMOudhcwcnEP0hLBLu4JDg"],"at":{"EJLZcnDF6gCZdODVgYOczNCluO3CkJa0yONOkXvXiVO8":"again, one more message"}}]}"#;
         let deserialize_microledger: MicroledgerExample =
             serde_json::from_str(&serialized_microledger).unwrap();
         assert_eq!(3, deserialize_microledger.blocks.len());
 
-        let second_block_id: SelfAddressingPrefix = "E8Kfq3CHZe0gL6wUBQ9JJ7FOGBchDgAd_DkiHBTbO2CQ"
+        let second_block_id: SelfAddressingPrefix = "Er1nlzyvdg_aEC-jM8rsf5guXAA5HSkJ-cZQjJmejZV0"
             .parse()
             .unwrap();
 
@@ -160,7 +166,7 @@ pub mod test {
 
         // test `get_last_block`
         let last = deserialize_microledger.get_last_block().unwrap().clone();
-        let sed_last = r#"{"seals":["E6AVF6hEJH0NS-bTZvfKac9EIDXfmpVSTzvzyKGGmn9I"],"previous":"E8Kfq3CHZe0gL6wUBQ9JJ7FOGBchDgAd_DkiHBTbO2CQ","rules":{"public_keys":["DRvBjYO4-wuK7mCpntD4Su7yBNqP3W30YUAiV1aQffyo"]}}"#;
+        let sed_last = r#"{"s":["EJLZcnDF6gCZdODVgYOczNCluO3CkJa0yONOkXvXiVO8"],"p":"Er1nlzyvdg_aEC-jM8rsf5guXAA5HSkJ-cZQjJmejZV0","ci":["Dl0XOCM8-xCHuf9nFZllJmKCWoBZNy9gf6uopXxQLuho"]}"#;
         let block: BlockType = serde_json::from_str(sed_last).unwrap();
         assert_eq!(last, block);
 
