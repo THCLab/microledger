@@ -1,16 +1,46 @@
 use said::{derivation::SelfAddressing, prefix::SelfAddressingPrefix};
 use serde::{Deserialize, Deserializer, Serialize, Serializer};
 
+use crate::error::Error;
+
+#[typetag::serde(tag = "type")]
 pub trait Seal {
     fn to_str(&self) -> String;
-    fn derive(data: &[u8]) -> Self;
-    fn get_attachement(&self) -> Option<String>;
+    fn check(&self) -> bool;
+    fn get(&self) -> Result<String, Error>;
+    fn box_clone(&self) -> Box<dyn Seal>;
+}
+
+pub trait SealData {
+    fn fingerprint(&self) -> Box<dyn Seal>;
+    fn get_data(&self) -> String;
+    fn is_attached(&self) -> bool;
 }
 
 #[derive(Clone, PartialEq, Debug)]
 pub struct AttachmentSeal {
     data: Option<String>,
     sai: SelfAddressingPrefix,
+}
+
+impl SealData for AttachmentSeal {
+    fn fingerprint(&self) -> Box<dyn Seal> {
+        Box::new(self.get_digest())
+    }
+
+    fn get_data(&self) -> String {
+        self.data.clone().unwrap()
+    }
+
+    fn is_attached(&self) -> bool {
+        true
+    }
+}
+
+impl AttachmentSeal {
+    pub fn get_digest(&self) -> SelfAddressingPrefix {
+        self.sai.clone()
+    }
 }
 
 impl AttachmentSeal {
@@ -43,16 +73,19 @@ impl<'de> Deserialize<'de> for AttachmentSeal {
     }
 }
 
-impl Seal for AttachmentSeal {
+#[typetag::serde]
+impl Seal for SelfAddressingPrefix {
     fn to_str(&self) -> String {
-        self.sai.to_string()
+        self.to_string()
+    }
+    fn check(&self) -> bool {
+        todo!()
+    }
+    fn get(&self) -> Result<String, Error> {
+        todo!()
     }
 
-    fn derive(data: &[u8]) -> Self {
-        Self::new(data)
-    }
-
-    fn get_attachement(&self) -> Option<String> {
-        self.data.clone()
+    fn box_clone(&self) -> Box<dyn Seal> {
+        Box::new(self.clone())
     }
 }
