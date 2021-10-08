@@ -7,6 +7,8 @@ pub enum Error {
     MicroError(String),
     #[error("{0}")]
     BlockError(String),
+    #[error("{0}")]
+    SealError(String),
     #[error(transparent)]
     SignatureVerificationError(#[from] KeriError),
 }

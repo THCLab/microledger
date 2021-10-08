@@ -13,24 +13,6 @@ use crate::{
     Serialization,
 };
 
-impl Clone for Box<dyn Seal> {
-    fn clone(&self) -> Box<dyn Seal> {
-        self.box_clone()
-    }
-}
-
-impl PartialEq for Box<dyn Seal> {
-    fn eq(&self, other: &Self) -> bool {
-        self == other
-    }
-}
-
-impl Debug for Box<dyn Seal> {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        f.debug_tuple("Box").field(&self.to_str()).finish()
-    }
-}
-
 #[derive(Clone, Serialize, Deserialize, PartialEq, Debug)]
 pub struct Block<D, C>
 where
@@ -38,7 +20,7 @@ where
     C: ControlingIdentifier + Clone,
 {
     #[serde(rename = "s")]
-    pub seals: Vec<Box<dyn Seal>>,
+    pub seals: Vec<Seal>,
     #[serde(rename = "p", skip_serializing_if = "Option::is_none")]
     pub previous: Option<D>,
     #[serde(rename = "ci")]
@@ -60,11 +42,7 @@ where
     D: DigitalFingerprint + Serialize,
     C: ControlingIdentifier + Serialize + Clone,
 {
-    pub fn new(
-        seals: Vec<Box<dyn Seal>>,
-        previous: Option<D>,
-        controlling_identifiers: Vec<C>,
-    ) -> Self {
+    pub fn new(seals: Vec<Seal>, previous: Option<D>, controlling_identifiers: Vec<C>) -> Self {
         Self {
             seals,
             previous,
@@ -137,37 +115,35 @@ where
     }
 
     pub fn check_block(&self, block: Option<&Block<D, C>>) -> Result<bool> {
-        Ok(self.block.check_previous(block)?)
+        Ok(self.block.check_previous(block)? && self.check_seals()?)
     }
 
-    // fn check_seals(&self) -> Result<bool> {
-    //     // check if seal of given hash exists in provider
-    //     if self
-    //         .block
-    //         .seals
-    //         .iter()
-    //         .all(|s| self.attached_seal.clone().check(s.to_owned()))
-    //     {
-    //         Ok(true)
-    //     } else {
-    //         Err(Error::BlockError(
-    //             "anchored data doesn't exist in seal provider".into(),
-    //         ))
-    //     }
-    // }
+    fn check_seals(&self) -> Result<bool> {
+        // check if seal of given hash exists in block attachement
+        if self
+            .block
+            .seals
+            .iter()
+            // TODO check all seals
+            .filter(|s| matches!(s, Seal::Attached(_)))
+            .all(|s| self.attached_seal.clone().get(&s.fingerprint()).is_some())
+        {
+            Ok(true)
+        } else {
+            Err(Error::BlockError(
+                "anchored data doesn't exist in seal provider".into(),
+            ))
+        }
+    }
 }
 
 #[cfg(test)]
 pub mod test {
-    use keri::{
-        derivation::basic::Basic,
-        keys::PublicKey,
-        prefix::BasicPrefix,
-    };
+    use keri::{derivation::basic::Basic, keys::PublicKey, prefix::BasicPrefix};
     use rand::rngs::OsRng;
     use said::{derivation::SelfAddressing, prefix::SelfAddressingPrefix};
 
-    use crate::{block::Block, seals::AttachmentSeal, Serialization};
+    use crate::{block::Block, seals::Seal, Serialization};
     #[test]
     fn test_block_serialization() {
         type BlockExample = Block<SelfAddressingPrefix, BasicPrefix>;
@@ -176,10 +152,10 @@ pub mod test {
         let (pk, _sk) = (kp.public, kp.secret);
         let bp = Basic::Ed25519.derive(PublicKey::new(pk.as_bytes().to_vec()));
 
-        let seal = AttachmentSeal::new("example".as_bytes()); // SelfAddressing::Blake3_256.derive("exmaple".as_bytes());
+        let seal = SelfAddressing::Blake3_256.derive("exmaple".as_bytes());
         let prev: Option<SelfAddressingPrefix> =
             Some(SelfAddressing::Blake3_256.derive("exmaple".as_bytes()));
-        let block: BlockExample = Block::new(vec![Box::new(seal.get_digest())], prev, vec![bp]);
+        let block: BlockExample = Block::new(vec![Seal::Attached(seal)], prev, vec![bp]);
         println!("{}", String::from_utf8(block.serialize()).unwrap());
 
         let deserialized_block: BlockExample = serde_json::from_slice(&block.serialize()).unwrap();

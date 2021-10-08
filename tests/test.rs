@@ -4,7 +4,11 @@ use keri::{
     keys::{PrivateKey, PublicKey},
     prefix::{BasicPrefix, SelfSigningPrefix},
 };
-use microledger::{error::Error, seal_bundle::SealBundle, seals::AttachmentSeal, Serialization};
+use microledger::{
+    error::Error,
+    seal_bundle::{SealBundle, SealData},
+    Serialization,
+};
 use rand::rngs::OsRng;
 use said::prefix::SelfAddressingPrefix;
 
@@ -26,8 +30,7 @@ fn test() -> Result<(), Error> {
     let payload = "some message";
     let bp = Basic::Ed25519.derive(pk);
 
-    let mut seal_bundle = SealBundle::new();
-    seal_bundle.attach(Box::new(AttachmentSeal::new(payload.as_bytes())));
+    let seal_bundle = SealBundle::new().attach(SealData::AttachedData(payload.to_string()));
 
     let block = microledger.pre_anchor_block(vec![bp], &seal_bundle);
 
@@ -45,8 +48,7 @@ fn test() -> Result<(), Error> {
     let (npk, _nsk) = generate_key_pair();
     let nbp = Basic::Ed25519.derive(npk);
 
-    let mut seal_bundle = SealBundle::new();
-    seal_bundle.attach(Box::new(AttachmentSeal::new(payload.as_bytes())));
+    let seal_bundle = SealBundle::new().attach(SealData::AttachedData(payload.to_string()));
 
     let block0 = microledger.pre_anchor_block(vec![nbp.clone()], &seal_bundle);
 
@@ -76,8 +78,7 @@ fn test() -> Result<(), Error> {
     let (nnpk, nnsk) = generate_key_pair();
     let nnbp = Basic::Ed25519.derive(nnpk);
 
-    let mut seal_bundle = SealBundle::new();
-    seal_bundle.attach(Box::new(AttachmentSeal::new(payload.as_bytes())));
+    let seal_bundle = SealBundle::new().attach(SealData::AttachedData(payload.to_string()));
 
     let block2 = microledger.pre_anchor_block(vec![nnbp], &seal_bundle);
 
@@ -93,8 +94,7 @@ fn test() -> Result<(), Error> {
     let (nnpk, _nnsk) = generate_key_pair();
     let nnbp = Basic::Ed25519.derive(nnpk);
 
-    let mut seal_bundle = SealBundle::new();
-    seal_bundle.attach(Box::new(AttachmentSeal::new(payload.as_bytes())));
+    let seal_bundle = SealBundle::new().attach(SealData::AttachedData(payload.to_string()));
 
     let block3 = microledger1.pre_anchor_block(vec![nnbp], &seal_bundle);
 

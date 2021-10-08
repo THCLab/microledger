@@ -1,91 +1,63 @@
-use said::{derivation::SelfAddressing, prefix::SelfAddressingPrefix};
+use std::str::FromStr;
+
+use said::prefix::SelfAddressingPrefix;
 use serde::{Deserialize, Deserializer, Serialize, Serializer};
 
 use crate::error::Error;
 
-#[typetag::serde(tag = "type")]
-pub trait Seal {
-    fn to_str(&self) -> String;
-    fn check(&self) -> bool;
-    fn get(&self) -> Result<String, Error>;
-    fn box_clone(&self) -> Box<dyn Seal>;
+#[derive(Clone, Debug, PartialEq)]
+pub enum Seal {
+    Attached(SelfAddressingPrefix),
 }
 
-pub trait SealData {
-    fn fingerprint(&self) -> Box<dyn Seal>;
-    fn get_data(&self) -> String;
-    fn is_attached(&self) -> bool;
-}
-
-#[derive(Clone, PartialEq, Debug)]
-pub struct AttachmentSeal {
-    data: Option<String>,
-    sai: SelfAddressingPrefix,
-}
-
-impl SealData for AttachmentSeal {
-    fn fingerprint(&self) -> Box<dyn Seal> {
-        Box::new(self.get_digest())
+impl Seal {
+    pub fn fingerprint(&self) -> String {
+        match self {
+            Seal::Attached(sai) => sai.to_string(),
+        }
     }
-
-    fn get_data(&self) -> String {
-        self.data.clone().unwrap()
-    }
-
-    fn is_attached(&self) -> bool {
-        true
-    }
-}
-
-impl AttachmentSeal {
-    pub fn get_digest(&self) -> SelfAddressingPrefix {
-        self.sai.clone()
-    }
-}
-
-impl AttachmentSeal {
-    pub fn new(data: &[u8]) -> Self {
-        Self {
-            data: Some(String::from_utf8(data.to_vec()).unwrap()),
-            sai: SelfAddressing::Blake3_256.derive(data),
+    pub fn to_str(&self) -> String {
+        match self {
+            Seal::Attached(sai) => ["A", &sai.to_string()].join(""),
         }
     }
 }
 
-impl Serialize for AttachmentSeal {
+impl FromStr for Seal {
+    type Err = Error;
+
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        match &s[..1] {
+            "A" => Ok(Seal::Attached(s[1..].parse().map_err(|_e| {
+                Error::SealError("Can't parse self adressing prefix".into())
+            })?)),
+            _ => Err(Error::SealError("Improper seal prefix".into())),
+        }
+    }
+}
+
+impl Serialize for Seal {
     fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
     where
         S: Serializer,
     {
-        serializer.serialize_str(&self.sai.to_string())
+        serializer.serialize_str(&self.to_str())
     }
 }
 
-impl<'de> Deserialize<'de> for AttachmentSeal {
-    fn deserialize<D>(deserializer: D) -> Result<AttachmentSeal, D::Error>
+impl<'de> Deserialize<'de> for Seal {
+    fn deserialize<D>(deserializer: D) -> Result<Seal, D::Error>
     where
         D: Deserializer<'de>,
     {
         let s = String::deserialize(deserializer)?;
-        let sai = s.parse().map_err(serde::de::Error::custom)?;
-
-        Ok(AttachmentSeal { data: None, sai })
+        Seal::from_str(&s).map_err(serde::de::Error::custom)
     }
 }
 
-#[typetag::serde]
-impl Seal for SelfAddressingPrefix {
-    fn to_str(&self) -> String {
-        self.to_string()
-    }
-    fn check(&self) -> bool {
-        todo!()
-    }
-    fn get(&self) -> Result<String, Error> {
-        todo!()
-    }
-
-    fn box_clone(&self) -> Box<dyn Seal> {
-        Box::new(self.clone())
-    }
+#[test]
+pub fn test_parse_seal() {
+    let seal_str = "AEPq_TXbqQFKrIZn9Sw8CGDMVqcDF4eipFgHr__lhcics";
+    let seal: Result<Seal, _> = Seal::from_str(&seal_str);
+    assert!(seal.is_ok());
 }

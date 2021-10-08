@@ -1,12 +1,27 @@
+use said::derivation::SelfAddressing;
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 
-use crate::{
-    seals::{Seal, SealData},
-};
+use crate::seals::Seal;
 
+#[derive(Clone)]
+pub enum SealData {
+    AttachedData(String),
+}
+
+impl SealData {
+    pub fn fingerprint(&self) -> Seal {
+        match self {
+            SealData::AttachedData(data) => {
+                Seal::Attached(SelfAddressing::Blake3_256.derive(data.as_bytes()))
+            }
+        }
+    }
+}
+
+#[derive(Default)]
 pub struct SealBundle {
-    pub seals: Vec<Box<dyn SealData>>,
+    pub seals: Vec<SealData>,
 }
 
 impl SealBundle {
@@ -14,24 +29,28 @@ impl SealBundle {
         Self { seals: vec![] }
     }
 
-    pub fn attach(&mut self, seal_data: Box<dyn SealData>) {
-        self.seals.push(seal_data);
+    pub fn attach(&self, seal_data: SealData) -> Self {
+        let mut seals = self.seals.clone();
+        seals.push(seal_data);
+        Self { seals }
     }
 
-    pub fn get_fingerprints(&self) -> Vec<Box<dyn Seal>> {
+    pub fn get_fingerprints(&self) -> Vec<Seal> {
         self.seals.iter().map(|s| s.fingerprint()).collect()
     }
 
     pub fn get_attachement(&self) -> BlockAttachment {
         let mut hm = HashMap::new();
-        let _filtered_seals = self.seals.iter().filter(|s| s.is_attached()).for_each(|s| {
-            hm.insert(s.fingerprint().to_str(), s.get_data());
+        let _filtered_seals = self.seals.iter().for_each(|s| match s {
+            SealData::AttachedData(data) => {
+                hm.insert(s.fingerprint().fingerprint(), data.to_string());
+            }
         });
         BlockAttachment { attachements: hm }
     }
 }
 
-#[derive(Clone, Serialize, Deserialize, Debug)]
+#[derive(Clone, Serialize, Deserialize, Debug, Default)]
 pub struct BlockAttachment {
     attachements: HashMap<String, String>,
 }
