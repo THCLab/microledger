@@ -1,3 +1,4 @@
+use ::microledger::error::Error;
 use ::microledger::microledger::MicroLedger;
 use clap::{App, Arg};
 use keri::{
@@ -8,7 +9,6 @@ use keri::{
 use microledger::{
     block::Block,
     seal_bundle::{BlockAttachment, SealBundle, SealData},
-    Serialization,
 };
 use said::prefix::SelfAddressingPrefix;
 use std::io::{self, Read};
@@ -52,14 +52,14 @@ fn main() -> Result<(), microledger::error::Error> {
                 .long("controller")
                 .takes_value(true)
                 .value_name("VEC")
-                .about("Set controller identifier"),
+                .about("Set controlling identifier"),
         )
         .arg(
             Arg::new("anchor")
                 .short('a')
                 .long("anchor")
                 .takes_value(true)
-                .value_name("STRING")
+                .value_name("BLOCK")
                 .about("Add block to microledger"),
         )
         .arg(
@@ -67,7 +67,7 @@ fn main() -> Result<(), microledger::error::Error> {
                 .short('s')
                 .long("signatures")
                 .takes_value(true)
-                .value_name("VEC")
+                .value_name("SIGNATURE")
                 .about("Attach signature to block"),
         )
         .arg(
@@ -92,7 +92,6 @@ fn main() -> Result<(), microledger::error::Error> {
         let controlling_id = Basic::Ed25519.derive(PublicKey::new(public_key_raw));
 
         let seal_bundle = if let Some(i) = matches.values_of("embeddedAttachement") {
-            // println!("Next block value: {:?}", i.collect::<Vec<_>>());
             i.fold(SealBundle::new(), |acc, data| {
                 acc.attach(SealData::AttachedData(data.to_string()))
             })
@@ -101,9 +100,9 @@ fn main() -> Result<(), microledger::error::Error> {
         };
 
         let block = microledger.pre_anchor_block(vec![controlling_id], &seal_bundle);
-        println!("{:?}", serde_json::to_string(&block).unwrap());
+        println!("{}", serde_json::to_string(&block).unwrap());
         println!(
-            "{:?}",
+            "{}",
             serde_json::to_string(&seal_bundle.get_attachement()).unwrap()
         );
     }
@@ -116,8 +115,9 @@ fn main() -> Result<(), microledger::error::Error> {
                 .map_err(|e| microledger::error::Error::MicroError(e.to_string()))?;
             let s = SelfSigning::Ed25519Sha512.derive(signature_raw);
 
-            let seal_bundle = if let Some(attachement) = matches.value_of("attachement") {
-                let seals: BlockAttachment = serde_json::from_str(attachement).unwrap();
+            let seal_bundle = if let Some(attachment) = matches.value_of("attachment") {
+                let seals: BlockAttachment = serde_json::from_str(attachment)
+                    .map_err(|e| Error::MicroError(e.to_string()))?;
                 seals.to_seal_bundle()
             } else {
                 SealBundle::new()
@@ -126,6 +126,7 @@ fn main() -> Result<(), microledger::error::Error> {
             let m = microledger.anchor(signed_block)?;
             println!("{}", serde_json::to_string(&m).unwrap());
         } else {
+            // missing signatures
         }
     }
 
