@@ -65,4 +65,10 @@ impl BlockAttachment {
     pub fn get(&self, digest: &str) -> Option<String> {
         self.attachements.get(digest).map(|s| s.to_string())
     }
+
+    pub fn to_seal_bundle(&self) -> SealBundle {
+        self.attachements.iter().fold(SealBundle::new(), |acc, v| {
+            acc.attach(SealData::AttachedData(v.1.clone()))
+        })
+    }
 }
