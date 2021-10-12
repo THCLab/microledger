@@ -4,7 +4,7 @@ use clap::{App, Arg};
 use keri::{
     derivation::{basic::Basic, self_signing::SelfSigning},
     keys::PublicKey,
-    prefix::{BasicPrefix, Prefix, SelfSigningPrefix},
+    prefix::{BasicPrefix, SelfSigningPrefix},
 };
 use microledger::{
     block::Block,

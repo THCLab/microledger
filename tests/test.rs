@@ -1,8 +1,8 @@
 use ::microledger::microledger::MicroLedger;
 use keri::{
-    derivation::{basic::Basic, self_addressing::SelfAddressing, self_signing::SelfSigning},
+    derivation::{basic::Basic, self_signing::SelfSigning},
     keys::{PrivateKey, PublicKey},
-    prefix::{BasicPrefix, Prefix, SelfSigningPrefix},
+    prefix::{BasicPrefix, SelfSigningPrefix},
 };
 use microledger::{
     error::Error,

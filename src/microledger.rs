@@ -1,4 +1,3 @@
-use said::prefix::SelfAddressingPrefix;
 use serde::{Deserialize, Serialize};
 
 use crate::error::Error;
@@ -98,7 +97,7 @@ where
     }
 
     /// Returns block of given fingerprint
-    pub fn get_block(&self, fingerprint: &SelfAddressingPrefix) -> Result<Block<D, C>> {
+    pub fn get_block(&self, fingerprint: impl DigitalFingerprint) -> Result<Block<D, C>> {
         self.blocks
             .iter()
             .find(|b| fingerprint.verify_binding(&Serialization::serialize(&b.block)))
