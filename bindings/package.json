@@ -1,0 +1,32 @@
+{
+  "name": "microledger",
+  "version": "1.0.0",
+  "description": "Rust based implementation of the Microledger concept proposed [here](https://github.com/the-human-colossus-foundation/microledger-spec/blob/main/microledger.md).",
+  "main": "index.js",
+  "directories": {
+    "test": "tests"
+  },
+  "scripts": {
+    "install": "npm run build",
+    "build": "cargo-cp-artifact -nc index.node -- cargo build --message-format=json-render-diagnostics"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/THCLab/microledger.git"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "bugs": {
+    "url": "https://github.com/THCLab/microledger/issues"
+  },
+  "homepage": "https://github.com/THCLab/microledger#readme",
+  "devDependencies": {
+    "cargo-cp-artifact": "^0.1.5"
+  },
+  "dependencies": {
+    "js-base64": "^3.7.2",
+    "tweetnacl": "^1.0.3",
+    "tweetnacl-util": "^0.15.1"
+  }
+}

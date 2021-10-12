@@ -18,3 +18,9 @@ clap = "3.0.0-beta.4"
 [dev-dependencies]
 ed25519-dalek = "1.0.1"
 rand = { version = "0.7.3", features = ["std", "getrandom"]}
+
+[workspace]
+
+members = [
+    "bindings",
+]
