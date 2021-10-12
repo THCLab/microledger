@@ -100,15 +100,13 @@ fn main() -> Result<(), Error> {
 
     if let Some(ref matches) = matches.subcommand_matches("next") {
         // generate next block
-        let public_key_raw: Vec<u8> = if let Some(c) = matches.value_of("controller") {
-            serde_json::from_str(c)
-                .map_err(|e| microledger::error::Error::MicroError(e.to_string()))
+        let controlling_id: BasicPrefix = if let Some(c) = matches.value_of("controller") {
+            Ok(c.parse()?)
         } else {
             Err(microledger::error::Error::BlockError(
                 "missing ids".to_string(),
             ))
         }?;
-        let controlling_id = Basic::Ed25519.derive(PublicKey::new(public_key_raw));
 
         let seal_bundle = if let Some(i) = matches.values_of("embeddedAttachement") {
             i.fold(SealBundle::new(), |acc, data| {
@@ -133,9 +131,7 @@ fn main() -> Result<(), Error> {
         let block: Block<SelfAddressingPrefix, BasicPrefix> = serde_json::from_str(&block).unwrap();
 
         if let Some(signature) = matches.value_of("signatures") {
-            let signature_raw = serde_json::from_str(signature)
-                .map_err(|e| microledger::error::Error::MicroError(e.to_string()))?;
-            let s = SelfSigning::Ed25519Sha512.derive(signature_raw);
+            let s: SelfSigningPrefix = signature.parse()?;
 
             let seal_bundle = if let Some(attachment) = matches.value_of("attachment") {
                 let seals: BlockAttachment = serde_json::from_str(attachment)
