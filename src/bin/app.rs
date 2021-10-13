@@ -41,8 +41,8 @@ fn main() -> Result<(), Error> {
         if serialized_microledger.len() == 0 {
             MicroLedger::new()
         } else {
-            serde_json::from_str(&serialized_microledger)
-                .map_err(|e| microledger::error::Error::MicroError(e.to_string()))?
+            serde_json::from_str(&serialized_microledger).unwrap_or(MicroLedger::new())
+                // .map_err(|e| microledger::error::Error::MicroError(e.to_string()))?
         };
 
     // Parse arguments
