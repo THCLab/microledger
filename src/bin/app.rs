@@ -11,14 +11,17 @@ use microledger::{
     seal_bundle::{BlockAttachment, SealBundle, SealData},
 };
 use said::prefix::SelfAddressingPrefix;
+use std::fs::File;
+use std::io::Write;
 use std::io::{self, Read};
+use std::path::Path;
 
 // Command line usage example:
 
 // * help ```cat a.json | ./target/debug/app -h```
 
 // * Create block that matches to last microledger from a.json. Sets public key
-// and attachements, save block and attachements in block file 
+// and attachements, save block and attachements in block file
 // ```cat c.json |
 // ./target/debug/app next -e dsdsds -e dededeas -c "[207, 33, 70, 140, 190, 73,
 // 227, 51, 134, 117, 155, 41, 226, 238, 28, 73, 46, 141, 11, 14, 220, 197, 14,
@@ -33,21 +36,52 @@ use std::io::{self, Read};
 // 72, 233, 168, 190, 242, 134, 196, 6]" --attachment $(tail -1 block)```
 
 fn main() -> Result<(), Error> {
-    // Read microledger
-    let mut serialized_microledger = String::new();
-    let mut stdin = io::stdin();
-    stdin.read_to_string(&mut serialized_microledger).unwrap();
-    let microledger: MicroLedger<SelfAddressingPrefix, BasicPrefix, SelfSigningPrefix> =
-        if serialized_microledger.len() == 0 {
-            MicroLedger::new()
-        } else {
-            serde_json::from_str(&serialized_microledger).unwrap_or(MicroLedger::new())
-                // .map_err(|e| microledger::error::Error::MicroError(e.to_string()))?
-        };
-
     // Parse arguments
     let matches = App::new("Microledger example")
+        .arg(
+            Arg::new("serialized_microledger")
+                .short('m')
+                .long("serialized_microledger")
+                .takes_value(true)
+                .about("JSON Serialized Microledge file to work with, if file does not exist would be created"),
+
+        )
+        .arg(
+            Arg::new("verbose")
+                .short('v')
+                .long("verbose")
+                .about("Be verbose, don't use compact serialization, split on the screen information what is going on")
+        )
         .version("1.0")
+        .subcommand(
+            App::new("create")
+                .about("Create new microledger, generate genesis block")
+                .arg(Arg::new("microledger_path")
+                    .short('m')
+                    .long("microledger_path")
+                    .takes_value(true)
+                    .about("Path to the file where microledger will be stored")
+                )
+                .arg(Arg::new("controller")
+                    .short('c')
+                    .long("controller")
+                    .takes_value(true)
+                    .multiple_values(true)
+                    .about("List of controller identifiers allowed to add next block, if empty the validation strategy can be applied externally or anyone can add next block")
+                )
+                .arg(Arg::new("timestamp")
+                    .short('t')
+                    .long("timestamp")
+                    .takes_value(true)
+                    .about("Add authentic timestamp")
+                )
+                .arg(Arg::new("seal")
+                    .short('s')
+                    .long("seal")
+                    .takes_value(true)
+                    .about("Digest of the data to be anchored on the block")
+                )
+        )
         .subcommand(
             App::new("next")
                 .about("Generate next block with given payload and controlling identifiers")
@@ -98,9 +132,17 @@ fn main() -> Result<(), Error> {
         )
         .get_matches();
 
-    if let Some(ref matches) = matches.subcommand_matches("next") {
-        // generate next block
-        let controlling_id: BasicPrefix = if let Some(c) = matches.value_of("controller") {
+    let verbose = matches.is_present("verbose");
+
+    // Create new microledger
+    if let Some(ref matches) = matches.subcommand_matches("create") {
+        let microledger_file_path = matches.value_of("microledger_path").unwrap();
+        let mut file =
+            File::create(microledger_file_path).expect("Can't create a microledger file");
+        let microledger: MicroLedger<SelfAddressingPrefix, BasicPrefix, SelfSigningPrefix> =
+            MicroLedger::new();
+
+        let controlling_ids: BasicPrefix = if let Some(c) = matches.value_of("controller") {
             Ok(c.parse()?)
         } else {
             Err(microledger::error::Error::BlockError(
@@ -116,37 +158,68 @@ fn main() -> Result<(), Error> {
             SealBundle::default()
         };
 
-        let block = microledger.pre_anchor_block(vec![controlling_id], &seal_bundle);
+        let block = microledger.pre_anchor_block(vec![controlling_ids], &seal_bundle);
         println!("{}", serde_json::to_string(&block).unwrap());
         println!(
             "{}",
             serde_json::to_string(&seal_bundle.get_attachement()).unwrap()
         );
+        let serialized_block = serde_json::to_string(&block).unwrap();
+        file.write_all(serialized_block.as_bytes());
     }
 
-    if let Some(ref matches) = matches.subcommand_matches("anchor") {
-        let block = matches
-            .value_of("block")
-            .ok_or(Error::MicroError("Missing block argument".into()))?;
-        let block: Block<SelfAddressingPrefix, BasicPrefix> = serde_json::from_str(&block).unwrap();
+    //    let microledger: MicroLedger<SelfAddressingPrefix, BasicPrefix, SelfSigningPrefix> =
+    //                serde_json::from_str(&serialized_microledger).unwrap_or(MicroLedger::new())
 
-        if let Some(signature) = matches.value_of("signatures") {
-            let s: SelfSigningPrefix = signature.parse()?;
-
-            let seal_bundle = if let Some(attachment) = matches.value_of("attachment") {
-                let seals: BlockAttachment = serde_json::from_str(attachment)
-                    .map_err(|e| Error::MicroError(e.to_string()))?;
-                seals.to_seal_bundle()
-            } else {
-                SealBundle::new()
-            };
-            let signed_block = block.to_signed_block(vec![s], &seal_bundle);
-            let m = microledger.anchor(signed_block)?;
-            println!("{}", serde_json::to_string(&m).unwrap());
-        } else {
-            // missing signatures
-        }
-    }
+    //    if let Some(ref matches) = matches.subcommand_matches("next") {
+    //        // generate next block
+    //        let controlling_id: BasicPrefix = if let Some(c) = matches.value_of("controller") {
+    //            Ok(c.parse()?)
+    //        } else {
+    //            Err(microledger::error::Error::BlockError(
+    //                "missing ids".to_string(),
+    //            ))
+    //        }?;
+    //
+    //        let seal_bundle = if let Some(i) = matches.values_of("embeddedAttachement") {
+    //            i.fold(SealBundle::new(), |acc, data| {
+    //                acc.attach(SealData::AttachedData(data.to_string()))
+    //            })
+    //        } else {
+    //            SealBundle::default()
+    //        };
+    //
+    //        let block = microledger.pre_anchor_block(vec![controlling_id], &seal_bundle);
+    //        println!("{}", serde_json::to_string(&block).unwrap());
+    //        println!(
+    //            "{}",
+    //            serde_json::to_string(&seal_bundle.get_attachement()).unwrap()
+    //        );
+    //    }
+    //
+    //    if let Some(ref matches) = matches.subcommand_matches("anchor") {
+    //        let block = matches
+    //            .value_of("block")
+    //            .ok_or(Error::MicroError("Missing block argument".into()))?;
+    //        let block: Block<SelfAddressingPrefix, BasicPrefix> = serde_json::from_str(&block).unwrap();
+    //
+    //        if let Some(signature) = matches.value_of("signatures") {
+    //            let s: SelfSigningPrefix = signature.parse()?;
+    //
+    //            let seal_bundle = if let Some(attachment) = matches.value_of("attachment") {
+    //                let seals: BlockAttachment = serde_json::from_str(attachment)
+    //                    .map_err(|e| Error::MicroError(e.to_string()))?;
+    //                seals.to_seal_bundle()
+    //            } else {
+    //                SealBundle::new()
+    //            };
+    //            let signed_block = block.to_signed_block(vec![s], &seal_bundle);
+    //            let m = microledger.anchor(signed_block)?;
+    //            println!("{}", serde_json::to_string(&m).unwrap());
+    //        } else {
+    //            // missing signatures
+    //        }
+    //    }
 
     Ok(())
 }
