@@ -1,5 +1,5 @@
 pub mod block;
-pub mod controling_identifiers;
+pub mod controlling_identifier;
 pub mod digital_fingerprint;
 pub mod error;
 pub mod microledger;

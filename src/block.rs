@@ -3,7 +3,7 @@ use std::fmt::Debug;
 use serde::{Deserialize, Serialize};
 
 use crate::{
-    controling_identifiers::ControlingIdentifier,
+    controlling_identifier::ControllingIdentifier,
     digital_fingerprint::DigitalFingerprint,
     error::Error,
     microledger::Result,
@@ -14,35 +14,27 @@ use crate::{
 };
 
 #[derive(Clone, Serialize, Deserialize, PartialEq, Debug)]
-pub struct Block<D, C>
-where
-    D: DigitalFingerprint,
-    C: ControlingIdentifier + Clone,
-{
+pub struct Block {
     #[serde(rename = "s")]
     pub seals: Vec<Seal>,
     #[serde(rename = "p", skip_serializing_if = "Option::is_none")]
-    pub previous: Option<D>,
+    pub previous: Option<DigitalFingerprint>,
     #[serde(rename = "ci")]
-    pub controlling_identifiers: Vec<C>,
+    pub controlling_identifiers: Vec<ControllingIdentifier>,
 }
 
-impl<D, C> Serialization for Block<D, C>
-where
-    D: DigitalFingerprint + Serialize,
-    C: ControlingIdentifier + Serialize + Clone,
-{
+impl Serialization for Block {
     fn serialize(&self) -> Vec<u8> {
         serde_json::to_string(self).unwrap().as_bytes().to_vec()
     }
 }
 
-impl<D, C> Block<D, C>
-where
-    D: DigitalFingerprint + Serialize,
-    C: ControlingIdentifier + Serialize + Clone,
-{
-    pub fn new(seals: Vec<Seal>, previous: Option<D>, controlling_identifiers: Vec<C>) -> Self {
+impl Block {
+    pub fn new(
+        seals: Vec<Seal>,
+        previous: Option<DigitalFingerprint>,
+        controlling_identifiers: Vec<ControllingIdentifier>,
+    ) -> Self {
         Self {
             seals,
             previous,
@@ -50,11 +42,11 @@ where
         }
     }
 
-    pub fn to_signed_block<S: Signature + Serialize>(
+    pub fn to_signed_block(
         self,
-        signatures: Vec<S>,
+        signatures: Vec<Signature>,
         seal_bundle: &SealBundle,
-    ) -> SignedBlock<C, D, S> {
+    ) -> SignedBlock {
         let attachement = seal_bundle.get_attachement();
         SignedBlock {
             block: self,
@@ -64,12 +56,8 @@ where
     }
 }
 
-impl<D, C> Block<D, C>
-where
-    C: ControlingIdentifier + Serialize + Clone,
-    D: DigitalFingerprint + Serialize,
-{
-    fn check_previous(&self, previous_block: Option<&Block<D, C>>) -> Result<bool> {
+impl Block {
+    fn check_previous(&self, previous_block: Option<&Block>) -> Result<bool> {
         match self.previous {
             Some(ref prev) => match previous_block {
                 Some(block) => Ok(prev.verify_binding(&Serialization::serialize(block))),
@@ -81,30 +69,22 @@ where
 }
 
 #[derive(Clone, Serialize, Deserialize)]
-pub struct SignedBlock<C, D, S>
-where
-    C: ControlingIdentifier + Serialize + Clone,
-    D: DigitalFingerprint + Serialize,
-    S: Signature + Serialize,
-{
+pub struct SignedBlock {
     #[serde(rename = "bl")]
-    pub block: Block<D, C>,
+    pub block: Block,
     #[serde(rename = "si")]
-    pub signatures: Vec<S>,
+    pub signatures: Vec<Signature>,
     // TODO should be vec in the future
     #[serde(rename = "at")]
     pub attached_seal: BlockAttachment,
 }
 
 // Checks if signed block matches the given block.
-impl<C, D, S> SignedBlock<C, D, S>
-where
-    C: ControlingIdentifier + Serialize + Clone,
-    D: DigitalFingerprint + Serialize,
-    S: Signature + Serialize,
-    S: Signature,
-{
-    pub fn verify(&self, controlling_identifiers: Option<Vec<C>>) -> Result<bool> {
+impl SignedBlock {
+    pub fn verify(
+        &self,
+        controlling_identifiers: Option<Vec<ControllingIdentifier>>,
+    ) -> Result<bool> {
         Ok(controlling_identifiers
             .unwrap_or_else(|| self.block.controlling_identifiers.clone())
             .iter()
@@ -114,7 +94,7 @@ where
             }))
     }
 
-    pub fn check_block(&self, block: Option<&Block<D, C>>) -> Result<bool> {
+    pub fn check_block(&self, block: Option<&Block>) -> Result<bool> {
         Ok(self.block.check_previous(block)? && self.check_seals()?)
     }
 
@@ -139,26 +119,32 @@ where
 
 #[cfg(test)]
 pub mod test {
-    use keri::{derivation::basic::Basic, keys::PublicKey, prefix::BasicPrefix};
+    use keri::{derivation::basic::Basic, keys::PublicKey};
     use rand::rngs::OsRng;
-    use said::{derivation::SelfAddressing, prefix::SelfAddressingPrefix};
+    use said::derivation::SelfAddressing;
 
-    use crate::{block::Block, seals::Seal, Serialization};
+    use crate::{
+        block::Block, controlling_identifier::ControllingIdentifier,
+        digital_fingerprint::DigitalFingerprint, seals::Seal, Serialization,
+    };
+
     #[test]
     fn test_block_serialization() {
-        type BlockExample = Block<SelfAddressingPrefix, BasicPrefix>;
         // generate keypair
         let kp = ed25519_dalek::Keypair::generate(&mut OsRng {});
         let (pk, _sk) = (kp.public, kp.secret);
-        let bp = Basic::Ed25519.derive(PublicKey::new(pk.as_bytes().to_vec()));
+        let bp = ControllingIdentifier::Basic(
+            Basic::Ed25519.derive(PublicKey::new(pk.as_bytes().to_vec())),
+        );
 
         let seal = SelfAddressing::Blake3_256.derive("exmaple".as_bytes());
-        let prev: Option<SelfAddressingPrefix> =
-            Some(SelfAddressing::Blake3_256.derive("exmaple".as_bytes()));
-        let block: BlockExample = Block::new(vec![Seal::Attached(seal)], prev, vec![bp]);
+        let prev = Some(DigitalFingerprint::SelfAddressing(
+            SelfAddressing::Blake3_256.derive("exmaple".as_bytes()),
+        ));
+        let block = Block::new(vec![Seal::Attached(seal)], prev, vec![(bp)]);
         println!("{}", String::from_utf8(block.serialize()).unwrap());
 
-        let deserialized_block: BlockExample = serde_json::from_slice(&block.serialize()).unwrap();
+        let deserialized_block: Block = serde_json::from_slice(&block.serialize()).unwrap();
         assert_eq!(block.serialize(), deserialized_block.serialize());
     }
 }

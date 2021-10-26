@@ -2,15 +2,15 @@ use ::microledger::error::Error;
 use ::microledger::microledger::MicroLedger;
 use clap::{App, Arg};
 use keri::{
-    derivation::{basic::Basic, self_signing::SelfSigning},
-    keys::PublicKey,
-    prefix::{BasicPrefix, SelfSigningPrefix},
+    prefix::{BasicPrefix},
 };
 use microledger::{
     block::Block,
+    controlling_identifier::ControllingIdentifier,
     seal_bundle::{BlockAttachment, SealBundle, SealData},
+    signature::Signature,
 };
-use said::prefix::SelfAddressingPrefix;
+
 use std::io::{self, Read};
 
 // Command line usage example:
@@ -18,7 +18,7 @@ use std::io::{self, Read};
 // * help ```cat a.json | ./target/debug/app -h```
 
 // * Create block that matches to last microledger from a.json. Sets public key
-// and attachements, save block and attachements in block file 
+// and attachements, save block and attachements in block file
 // ```cat c.json |
 // ./target/debug/app next -e dsdsds -e dededeas -c "[207, 33, 70, 140, 190, 73,
 // 227, 51, 134, 117, 155, 41, 226, 238, 28, 73, 46, 141, 11, 14, 220, 197, 14,
@@ -37,13 +37,12 @@ fn main() -> Result<(), Error> {
     let mut serialized_microledger = String::new();
     let mut stdin = io::stdin();
     stdin.read_to_string(&mut serialized_microledger).unwrap();
-    let microledger: MicroLedger<SelfAddressingPrefix, BasicPrefix, SelfSigningPrefix> =
-        if serialized_microledger.len() == 0 {
-            MicroLedger::new()
-        } else {
-            serde_json::from_str(&serialized_microledger).unwrap_or(MicroLedger::new())
-                // .map_err(|e| microledger::error::Error::MicroError(e.to_string()))?
-        };
+    let microledger: MicroLedger = if serialized_microledger.len() == 0 {
+        MicroLedger::new()
+    } else {
+        serde_json::from_str(&serialized_microledger).unwrap_or(MicroLedger::new())
+        // .map_err(|e| microledger::error::Error::MicroError(e.to_string()))?
+    };
 
     // Parse arguments
     let matches = App::new("Microledger example")
@@ -116,7 +115,10 @@ fn main() -> Result<(), Error> {
             SealBundle::default()
         };
 
-        let block = microledger.pre_anchor_block(vec![controlling_id], &seal_bundle);
+        let block = microledger.pre_anchor_block(
+            vec![ControllingIdentifier::Basic(controlling_id)],
+            &seal_bundle,
+        );
         println!("{}", serde_json::to_string(&block).unwrap());
         println!(
             "{}",
@@ -128,10 +130,10 @@ fn main() -> Result<(), Error> {
         let block = matches
             .value_of("block")
             .ok_or(Error::MicroError("Missing block argument".into()))?;
-        let block: Block<SelfAddressingPrefix, BasicPrefix> = serde_json::from_str(&block).unwrap();
+        let block: Block = serde_json::from_str(&block).unwrap();
 
         if let Some(signature) = matches.value_of("signatures") {
-            let s: SelfSigningPrefix = signature.parse()?;
+            let s = Signature::SelfSigning(signature.parse()?);
 
             let seal_bundle = if let Some(attachment) = matches.value_of("attachment") {
                 let seals: BlockAttachment = serde_json::from_str(attachment)
@@ -140,7 +142,7 @@ fn main() -> Result<(), Error> {
             } else {
                 SealBundle::new()
             };
-            let signed_block = block.to_signed_block(vec![s], &seal_bundle);
+            let signed_block = block.to_signed_block(vec![(s)], &seal_bundle);
             let m = microledger.anchor(signed_block)?;
             println!("{}", serde_json::to_string(&m).unwrap());
         } else {
