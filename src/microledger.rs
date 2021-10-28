@@ -121,12 +121,18 @@ pub mod test {
 
     #[test]
     fn test_microledger_traversing() {
-        let serialized_microledger = r#"{"bs":[{"bl":{"s":["AELw56P7ccBSkFj-THMErcH7RFX2Ph1fDUfQ1ErEmDuD4"],"ci":["ADzfIfArvcpqlhWPWALcqnf_VtQ4gX9Bg_av9e4dB7ciI"]},"si":["A0B_vrdVGJ19PJkIWT4KIJ2vnUAMUNS-T-A2FC3r1oWE84sBd0t3QFt3iAWtLq9TZ9ecHe_G6VX1y5oVQDDLFijCw"],"at":{"attachements":{"ELw56P7ccBSkFj-THMErcH7RFX2Ph1fDUfQ1ErEmDuD4":"some message"}}},{"bl":{"s":["AE6AVF6hEJH0NS-bTZvfKac9EIDXfmpVSTzvzyKGGmn9I"],"p":"AEa57Kf0zAZaVEO3cuWXEe2ihPA_i4FVq3PCyDNtVitgg","ci":["ADjdeUHPIYwMDlZJs0cfE60NDN2R4Eb9OmtKuNCmORWdI"]},"si":["A0B62_hffohOXC7luK-h3TwEfUGD4BpEX8kjEXwFpGA-I3BBjG11IslWD2umDZubf1a-XmQZxgwdQB0UPIf5MkuDg"],"at":{"attachements":{"E6AVF6hEJH0NS-bTZvfKac9EIDXfmpVSTzvzyKGGmn9I":"one more message"}}},{"bl":{"s":["AEJLZcnDF6gCZdODVgYOczNCluO3CkJa0yONOkXvXiVO8"],"p":"AEhvkz6v16nXuA9cD0yvkqPAcLJd1ajjiTGlWO9WfJZM4","ci":["ADZdoBkHaXfWqe63hMDgi2KG2CLAx3nJ6rjSn_aUxKd4w"]},"si":["A0B_gymZvjym-bC2a-n4Kx_FEszNllgxNJwYe0SuDpwWX8vtXAzJGJ5OZZxbHPrgfKwfiWHMNE_pVmzB1TjK8XUCw"],"at":{"attachements":{"EJLZcnDF6gCZdODVgYOczNCluO3CkJa0yONOkXvXiVO8":"again, one more message"}}}]}"#;
+        let serialized_microledger = 
+        r#"{"bs":[
+            {"bl":{"s":["AELw56P7ccBSkFj-THMErcH7RFX2Ph1fDUfQ1ErEmDuD4"],"ci":["ADzfIfArvcpqlhWPWALcqnf_VtQ4gX9Bg_av9e4dB7ciI"]},"si":["A0B_vrdVGJ19PJkIWT4KIJ2vnUAMUNS-T-A2FC3r1oWE84sBd0t3QFt3iAWtLq9TZ9ecHe_G6VX1y5oVQDDLFijCw"],"at":{"attachements":{"ELw56P7ccBSkFj-THMErcH7RFX2Ph1fDUfQ1ErEmDuD4":"some message"}}},
+            {"bl":{"s":["AE6AVF6hEJH0NS-bTZvfKac9EIDXfmpVSTzvzyKGGmn9I"],"p":"AEa57Kf0zAZaVEO3cuWXEe2ihPA_i4FVq3PCyDNtVitgg","ci":["ADjdeUHPIYwMDlZJs0cfE60NDN2R4Eb9OmtKuNCmORWdI"]},"si":["A0B62_hffohOXC7luK-h3TwEfUGD4BpEX8kjEXwFpGA-I3BBjG11IslWD2umDZubf1a-XmQZxgwdQB0UPIf5MkuDg"],"at":{"attachements":{"E6AVF6hEJH0NS-bTZvfKac9EIDXfmpVSTzvzyKGGmn9I":"one more message"}}},
+            {"bl":{"s":["AEJLZcnDF6gCZdODVgYOczNCluO3CkJa0yONOkXvXiVO8"],"p":"AEhvkz6v16nXuA9cD0yvkqPAcLJd1ajjiTGlWO9WfJZM4","ci":["ADZdoBkHaXfWqe63hMDgi2KG2CLAx3nJ6rjSn_aUxKd4w"]},"si":["A0B_gymZvjym-bC2a-n4Kx_FEszNllgxNJwYe0SuDpwWX8vtXAzJGJ5OZZxbHPrgfKwfiWHMNE_pVmzB1TjK8XUCw"],"at":{"attachements":{"EJLZcnDF6gCZdODVgYOczNCluO3CkJa0yONOkXvXiVO8":"again, one more message"}}}
+        ]}"#;
+
         let deserialize_microledger: MicroLedger =
             serde_json::from_str(serialized_microledger).unwrap();
         assert_eq!(3, deserialize_microledger.blocks.len());
 
-        let second_block_id: DigitalFingerprint = "AEHnMxBNMJJxfLq0jygxwLACPtuywOqGXc5Z2xU8giwI8"
+        let second_block_id: DigitalFingerprint = "AEhvkz6v16nXuA9cD0yvkqPAcLJd1ajjiTGlWO9WfJZM4"
             .parse()
             .unwrap();
 
