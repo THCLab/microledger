@@ -116,23 +116,19 @@ impl MicroLedger {
 
 #[cfg(test)]
 pub mod test {
-    
-    
 
     use crate::{block::Block, digital_fingerprint::DigitalFingerprint, microledger::MicroLedger};
 
     #[test]
     fn test_microledger_traversing() {
-        let serialized_microledger = r#"{"bs":[{"bl":{"s":["AELw56P7ccBSkFj-THMErcH7RFX2Ph1fDUfQ1ErEmDuD4"],"ci":["DjUa-x_AosMd8MpJ_DEj2HAfADxTpViPWi-bs47wld6w"]},"si":["0BVDIxO0hQbEa1a83PikJbAc2vZ8R0rXUS21PnoyD5Bs1zKnrS-vnJ6WWRoVspDmq6Camio89bUAT0B04DrI_lCw"],"at":{"attachements":{"ELw56P7ccBSkFj-THMErcH7RFX2Ph1fDUfQ1ErEmDuD4":"some message"}}},{"bl":{"s":["AE6AVF6hEJH0NS-bTZvfKac9EIDXfmpVSTzvzyKGGmn9I"],"p":"EVatnlUNghpjIrUnP8nBF3h4-62i1j1VEX_agal9YbWI","ci":["DOpO_5SG-mg9-Me_nqAqQgc-6si7kNmtuHLNTW3rNvDE"]},"si":["0B36jjwROTKGFxxI6mNgnmKPTu2eUbH0f322eMq44BzHCtJweHEo0Q4P2NYJWeZGQ6SbTEyAE9oewjPITtupftCg"],"at":{"attachements":{"E6AVF6hEJH0NS-bTZvfKac9EIDXfmpVSTzvzyKGGmn9I":"one more message"}}},{"bl":{"s":["AEJLZcnDF6gCZdODVgYOczNCluO3CkJa0yONOkXvXiVO8"],"p":"EtL-bxZmNJQQwrQH5pABTn-RpfCriJhThyDwlDYzDGTk","ci":["DA0V3PfIaXdoHYWIQVrLAS262ZZuG7hquOno8a5y65vQ"]},"si":["0BLL3w9broV8Trn9sNQyhYOqXDpC51thWMLWNgPHScFK_L69djevLXvsgt551MDuJ3dSACi6iFpYP5Ua-P9dQCCw"],"at":{"attachements":{"EJLZcnDF6gCZdODVgYOczNCluO3CkJa0yONOkXvXiVO8":"again, one more message"}}}]}"#;
+        let serialized_microledger = r#"{"bs":[{"bl":{"s":["AELw56P7ccBSkFj-THMErcH7RFX2Ph1fDUfQ1ErEmDuD4"],"ci":["ADzfIfArvcpqlhWPWALcqnf_VtQ4gX9Bg_av9e4dB7ciI"]},"si":["A0B_vrdVGJ19PJkIWT4KIJ2vnUAMUNS-T-A2FC3r1oWE84sBd0t3QFt3iAWtLq9TZ9ecHe_G6VX1y5oVQDDLFijCw"],"at":{"attachements":{"ELw56P7ccBSkFj-THMErcH7RFX2Ph1fDUfQ1ErEmDuD4":"some message"}}},{"bl":{"s":["AE6AVF6hEJH0NS-bTZvfKac9EIDXfmpVSTzvzyKGGmn9I"],"p":"AEa57Kf0zAZaVEO3cuWXEe2ihPA_i4FVq3PCyDNtVitgg","ci":["ADjdeUHPIYwMDlZJs0cfE60NDN2R4Eb9OmtKuNCmORWdI"]},"si":["A0B62_hffohOXC7luK-h3TwEfUGD4BpEX8kjEXwFpGA-I3BBjG11IslWD2umDZubf1a-XmQZxgwdQB0UPIf5MkuDg"],"at":{"attachements":{"E6AVF6hEJH0NS-bTZvfKac9EIDXfmpVSTzvzyKGGmn9I":"one more message"}}},{"bl":{"s":["AEJLZcnDF6gCZdODVgYOczNCluO3CkJa0yONOkXvXiVO8"],"p":"AEhvkz6v16nXuA9cD0yvkqPAcLJd1ajjiTGlWO9WfJZM4","ci":["ADZdoBkHaXfWqe63hMDgi2KG2CLAx3nJ6rjSn_aUxKd4w"]},"si":["A0B_gymZvjym-bC2a-n4Kx_FEszNllgxNJwYe0SuDpwWX8vtXAzJGJ5OZZxbHPrgfKwfiWHMNE_pVmzB1TjK8XUCw"],"at":{"attachements":{"EJLZcnDF6gCZdODVgYOczNCluO3CkJa0yONOkXvXiVO8":"again, one more message"}}}]}"#;
         let deserialize_microledger: MicroLedger =
             serde_json::from_str(serialized_microledger).unwrap();
         assert_eq!(3, deserialize_microledger.blocks.len());
 
-        let second_block_id = DigitalFingerprint::SelfAddressing(
-            "EtL-bxZmNJQQwrQH5pABTn-RpfCriJhThyDwlDYzDGTk"
-                .parse()
-                .unwrap(),
-        );
+        let second_block_id: DigitalFingerprint = "AEHnMxBNMJJxfLq0jygxwLACPtuywOqGXc5Z2xU8giwI8"
+            .parse()
+            .unwrap();
 
         // test `at` function
         let at_micro = deserialize_microledger.at(&second_block_id).unwrap();
@@ -140,7 +136,7 @@ pub mod test {
 
         // test `get_last_block`
         let last = deserialize_microledger.get_last_block().unwrap().clone();
-        let sed_last = r#"{"s":["AEJLZcnDF6gCZdODVgYOczNCluO3CkJa0yONOkXvXiVO8"],"p":"EtL-bxZmNJQQwrQH5pABTn-RpfCriJhThyDwlDYzDGTk","ci":["DA0V3PfIaXdoHYWIQVrLAS262ZZuG7hquOno8a5y65vQ"]}"#;
+        let sed_last = r#"{"s":["AEJLZcnDF6gCZdODVgYOczNCluO3CkJa0yONOkXvXiVO8"],"p":"AEhvkz6v16nXuA9cD0yvkqPAcLJd1ajjiTGlWO9WfJZM4","ci":["ADZdoBkHaXfWqe63hMDgi2KG2CLAx3nJ6rjSn_aUxKd4w"]}"#;
         let block: Block = serde_json::from_str(sed_last).unwrap();
         assert_eq!(last, block);
 

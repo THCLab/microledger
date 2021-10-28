@@ -1,17 +1,16 @@
-use std::{convert::TryFrom, str::FromStr};
+use std::{fmt::Display, str::FromStr};
 
 use keri::{
     derivation::basic::Basic,
     keys::PublicKey,
     prefix::{Prefix, SelfSigningPrefix},
 };
-use serde::{Deserialize, Serialize};
+use serde::{Deserialize, Deserializer, Serialize, Serializer};
 
 use crate::error::Error;
 
 /// Signatures include the cryptographic commitment of Custodians to a given Block.
-#[derive(Clone, Serialize, Deserialize, PartialEq, Debug)]
-#[serde(try_from = "String", into = "String")]
+#[derive(Clone, Debug, PartialEq)]
 pub enum Signature {
     SelfSigning(SelfSigningPrefix),
 }
@@ -27,23 +26,43 @@ impl Signature {
     }
 }
 
-impl From<Signature> for String {
-    fn from(val: Signature) -> Self {
-        match val {
-            Signature::SelfSigning(id) => format!("A{}", id.to_str()),
+impl Display for Signature {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Signature::SelfSigning(id) => write!(f, "A{}", id.to_str()),
         }
     }
 }
 
-impl TryFrom<String> for Signature {
-    type Error = keri::error::Error;
+impl FromStr for Signature {
+    type Err = keri::error::Error;
 
-    fn try_from(value: String) -> Result<Self, Self::Error> {
-        match (value.get(..1), value.get(1..)) {
-            (Some("A"), Some(id)) => Ok(Self::SelfSigning(SelfSigningPrefix::from_str(id)?)),
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        match s.get(..1).zip(s.get(1..)) {
+            Some(("A", id)) => Ok(Self::SelfSigning(id.parse()?)),
             _ => Err(keri::error::Error::DeserializeError(
-                "unknown prefix".into(),
+                "Unknown prefix".into(),
             )),
         }
+    }
+}
+
+impl Serialize for Signature {
+    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+    where
+        S: Serializer,
+    {
+        serializer.serialize_str(&self.to_string())
+    }
+}
+
+impl<'de> Deserialize<'de> for Signature {
+    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+    where
+        D: Deserializer<'de>,
+    {
+        String::deserialize(deserializer)?
+            .parse()
+            .map_err(serde::de::Error::custom)
     }
 }

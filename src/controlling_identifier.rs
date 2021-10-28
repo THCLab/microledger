@@ -1,7 +1,7 @@
-use std::{convert::TryFrom, str::FromStr};
+use std::{fmt::Display, str::FromStr};
 
 use keri::prefix::{BasicPrefix, Prefix};
-use serde::{Deserialize, Serialize};
+use serde::{Deserialize, Deserializer, Serialize, Serializer};
 
 use crate::{error::Error, signature::Signature};
 
@@ -9,8 +9,7 @@ use crate::{error::Error, signature::Signature};
 /// Control _MAY_ be established for single or multiple identifiers through the multisig feature.
 /// Controlling identifiers can be anything that is considered identifiable within given network,
 /// ie. `Public Key`, `DID`, `KERI` prefix and so on.
-#[derive(Clone, Serialize, Deserialize, PartialEq, Debug)]
-#[serde(into = "String", try_from = "String")]
+#[derive(Clone, Debug, PartialEq)]
 pub enum ControllingIdentifier {
     Basic(BasicPrefix),
 }
@@ -25,23 +24,43 @@ impl ControllingIdentifier {
     }
 }
 
-impl From<ControllingIdentifier> for String {
-    fn from(val: ControllingIdentifier) -> Self {
-        match val {
-            ControllingIdentifier::Basic(id) => format!("A{}", id.to_str()),
+impl Display for ControllingIdentifier {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            ControllingIdentifier::Basic(id) => write!(f, "A{}", id.to_str()),
         }
     }
 }
 
-impl TryFrom<String> for ControllingIdentifier {
-    type Error = keri::error::Error;
+impl FromStr for ControllingIdentifier {
+    type Err = keri::error::Error;
 
-    fn try_from(value: String) -> Result<Self, Self::Error> {
-        match (value.get(..1), value.get(1..)) {
-            (Some("A"), Some(id)) => Ok(Self::Basic(BasicPrefix::from_str(id)?)),
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        match s.get(..1).zip(s.get(1..)) {
+            Some(("A", id)) => Ok(Self::Basic(id.parse()?)),
             _ => Err(keri::error::Error::DeserializeError(
                 "Unknown prefix".into(),
             )),
         }
+    }
+}
+
+impl Serialize for ControllingIdentifier {
+    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+    where
+        S: Serializer,
+    {
+        serializer.serialize_str(&self.to_string())
+    }
+}
+
+impl<'de> Deserialize<'de> for ControllingIdentifier {
+    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+    where
+        D: Deserializer<'de>,
+    {
+        String::deserialize(deserializer)?
+            .parse()
+            .map_err(serde::de::Error::custom)
     }
 }
