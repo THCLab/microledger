@@ -57,7 +57,7 @@ fn main() -> Result<(), Error> {
                         .takes_value(true)
                         .multiple_occurrences(true)
                         .value_name("STRING")
-                        .about("Add embedded attachement"),
+                        .help("Add embedded attachement"),
                 )
                 .arg(
                     Arg::new("controller")
@@ -65,7 +65,7 @@ fn main() -> Result<(), Error> {
                         .long("controller")
                         .takes_value(true)
                         .value_name("VEC")
-                        .about("Set controlling identifier"),
+                        .help("Set controlling identifier"),
                 ),
         )
         .subcommand(
@@ -77,7 +77,7 @@ fn main() -> Result<(), Error> {
                         .long("anchor")
                         .takes_value(true)
                         .value_name("BLOCK")
-                        .about("Block to be added"),
+                        .help("Block to be added"),
                 )
                 .arg(
                     Arg::new("signatures")
@@ -85,14 +85,14 @@ fn main() -> Result<(), Error> {
                         .long("signatures")
                         .takes_value(true)
                         .value_name("SIGNATURE")
-                        .about("Attach signature to block"),
+                        .help("Attach signature to block"),
                 )
                 .arg(
                     Arg::new("attachment")
                         .long("attachment")
                         .takes_value(true)
                         .value_name("STRING")
-                        .about("Attach seals to block"),
+                        .help("Attach seals to block"),
                 ),
         )
         .get_matches();
