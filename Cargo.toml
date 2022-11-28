@@ -2,7 +2,7 @@
 name = "microledger"
 description = "Microledger is an authentic data provider leveraging the concept of data provenance log. Provenance logs are intended to be a generalized form of a linked list data structure that uses cryptographic primitives to ensure integrity with a strong cryptographic link to a controller of the log."
 license = "EUPL-1.2"
-version = "0.1.0"
+version = "0.1.1"
 edition = "2018"
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
