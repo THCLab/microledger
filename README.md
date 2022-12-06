@@ -1,3 +1,9 @@
+# License
+
+EUPL 1.2 
+
+We have distilled the most crucial license specifics to make your adoption seamless: [see here for details](https://github.com/THCLab/licensing).
+
 # Overview
 
 Rust based implementation of the Microledger concept proposed [here](https://github.com/the-human-colossus-foundation/microledger-spec/blob/main/microledger.md). 
