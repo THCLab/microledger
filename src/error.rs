@@ -1,4 +1,4 @@
-use keri::error::Error as KeriError;
+use keri::prefix::error::Error as PrefixError;
 use thiserror::Error;
 
 #[derive(Error, Debug)]
@@ -9,6 +9,8 @@ pub enum Error {
     BlockError(String),
     #[error("{0}")]
     SealError(String),
+    #[error("Signature verification error")]
+    SignatureVerificationError,
     #[error(transparent)]
-    SignatureVerificationError(#[from] KeriError),
+    BasicPrefixError(#[from] PrefixError),
 }

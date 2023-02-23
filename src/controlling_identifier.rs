@@ -1,6 +1,7 @@
 use std::{fmt::Display, str::FromStr};
 
-use keri::prefix::{BasicPrefix, Prefix};
+use cesrox::primitives::CesrPrimitive;
+use keri::prefix::BasicPrefix;
 use serde::{Deserialize, Deserializer, Serialize, Serializer};
 
 use crate::{error::Error, signature::Signature};
@@ -17,9 +18,7 @@ pub enum ControllingIdentifier {
 impl ControllingIdentifier {
     pub fn check_signatures(&self, msg: &[u8], signatures: &[Signature]) -> Result<bool, Error> {
         match self {
-            Self::Basic(id) => Ok(signatures
-                .iter()
-                .any(|s| s.verify_with(msg, &id.public_key.key()).unwrap())),
+            Self::Basic(id) => Ok(signatures.iter().any(|s| s.verify_with(msg, id).unwrap())),
         }
     }
 }

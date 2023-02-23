@@ -1,9 +1,7 @@
 use ::microledger::error::Error;
 use ::microledger::microledger::MicroLedger;
 use clap::{App, Arg};
-use keri::{
-    prefix::{BasicPrefix},
-};
+use keri::prefix::BasicPrefix;
 use microledger::{
     block::Block,
     controlling_identifier::ControllingIdentifier,
@@ -37,7 +35,7 @@ fn main() -> Result<(), Error> {
     let mut serialized_microledger = String::new();
     let mut stdin = io::stdin();
     stdin.read_to_string(&mut serialized_microledger).unwrap();
-    let microledger: MicroLedger = if serialized_microledger.len() == 0 {
+    let microledger: MicroLedger = if serialized_microledger.is_empty() {
         MicroLedger::new()
     } else {
         serde_json::from_str(&serialized_microledger).unwrap_or(MicroLedger::new())
@@ -97,7 +95,7 @@ fn main() -> Result<(), Error> {
         )
         .get_matches();
 
-    if let Some(ref matches) = matches.subcommand_matches("next") {
+    if let Some(matches) = matches.subcommand_matches("next") {
         // generate next block
         let controlling_id: BasicPrefix = if let Some(c) = matches.value_of("controller") {
             Ok(c.parse()?)
@@ -126,11 +124,11 @@ fn main() -> Result<(), Error> {
         );
     }
 
-    if let Some(ref matches) = matches.subcommand_matches("anchor") {
+    if let Some(matches) = matches.subcommand_matches("anchor") {
         let block = matches
             .value_of("block")
             .ok_or(Error::MicroError("Missing block argument".into()))?;
-        let block: Block = serde_json::from_str(&block).unwrap();
+        let block: Block = serde_json::from_str(block).unwrap();
 
         if let Some(signature) = matches.value_of("signatures") {
             let s = Signature::SelfSigning(signature.parse()?);

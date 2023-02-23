@@ -1,6 +1,6 @@
 use std::{fmt::Display, str::FromStr};
 
-use said::{derivation::SelfAddressing, prefix::SelfAddressingPrefix};
+use sai::{derivation::SelfAddressing, SelfAddressingPrefix};
 use serde::{Deserialize, Deserializer, Serialize, Serializer};
 
 /// A digital fingerprint include the cryptographically derived unique fingerprint of a given block.
@@ -25,20 +25,18 @@ impl DigitalFingerprint {
 impl Display for DigitalFingerprint {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
-            DigitalFingerprint::SelfAddressing(id) => write!(f, "A{}", id),
+            DigitalFingerprint::SelfAddressing(id) => write!(f, "A{id}"),
         }
     }
 }
 
 impl FromStr for DigitalFingerprint {
-    type Err = said::error::Error;
+    type Err = sai::error::Error;
 
     fn from_str(s: &str) -> Result<Self, Self::Err> {
         match s.get(..1).zip(s.get(1..)) {
             Some(("A", id)) => Ok(Self::SelfAddressing(id.parse()?)),
-            _ => Err(said::error::Error::DeserializationError(
-                "Unknown prefix".into(),
-            )),
+            _ => Err(sai::error::Error::DeserializeError("Unknown prefix".into())),
         }
     }
 }

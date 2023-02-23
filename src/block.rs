@@ -119,9 +119,9 @@ impl SignedBlock {
 
 #[cfg(test)]
 pub mod test {
-    use keri::{derivation::basic::Basic, keys::PublicKey};
+    use keri::{keys::PublicKey, prefix::BasicPrefix};
     use rand::rngs::OsRng;
-    use said::derivation::SelfAddressing;
+    use sai::derivation::SelfAddressing;
 
     use crate::{
         block::Block, controlling_identifier::ControllingIdentifier,
@@ -133,9 +133,9 @@ pub mod test {
         // generate keypair
         let kp = ed25519_dalek::Keypair::generate(&mut OsRng {});
         let (pk, _sk) = (kp.public, kp.secret);
-        let bp = ControllingIdentifier::Basic(
-            Basic::Ed25519.derive(PublicKey::new(pk.as_bytes().to_vec())),
-        );
+        let bp = ControllingIdentifier::Basic(BasicPrefix::Ed25519(PublicKey::new(
+            pk.as_bytes().to_vec(),
+        )));
 
         let seal = SelfAddressing::Blake3_256.derive("exmaple".as_bytes());
         let prev = Some(DigitalFingerprint::SelfAddressing(

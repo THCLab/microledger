@@ -1,4 +1,4 @@
-use said::derivation::SelfAddressing;
+use sai::derivation::SelfAddressing;
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 
@@ -41,7 +41,7 @@ impl SealBundle {
 
     pub fn get_attachement(&self) -> BlockAttachment {
         let mut hm = HashMap::new();
-        let _filtered_seals = self.seals.iter().for_each(|s| match s {
+        self.seals.iter().for_each(|s| match s {
             SealData::AttachedData(data) => {
                 hm.insert(s.fingerprint().fingerprint(), data.to_string());
             }

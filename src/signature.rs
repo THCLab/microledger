@@ -1,10 +1,7 @@
 use std::{fmt::Display, str::FromStr};
 
-use keri::{
-    derivation::basic::Basic,
-    keys::PublicKey,
-    prefix::{Prefix, SelfSigningPrefix},
-};
+use cesrox::primitives::CesrPrimitive;
+use keri::prefix::{BasicPrefix, SelfSigningPrefix};
 use serde::{Deserialize, Deserializer, Serialize, Serializer};
 
 use crate::error::Error;
@@ -16,12 +13,11 @@ pub enum Signature {
 }
 
 impl Signature {
-    pub fn verify_with(&self, data: &[u8], pk: &[u8]) -> Result<bool, Error> {
+    pub fn verify_with(&self, data: &[u8], pk: &BasicPrefix) -> Result<bool, Error> {
         match self {
-            Self::SelfSigning(prefix) => Basic::Ed25519
-                .derive(PublicKey::new(pk.to_vec()))
+            Self::SelfSigning(prefix) => pk
                 .verify(data, prefix)
-                .map_err(Error::SignatureVerificationError),
+                .map_err(|_| Error::SignatureVerificationError),
         }
     }
 }

@@ -1,6 +1,6 @@
 use std::str::FromStr;
 
-use said::prefix::SelfAddressingPrefix;
+use sai::SelfAddressingPrefix;
 use serde::{Deserialize, Deserializer, Serialize, Serializer};
 
 use crate::error::Error;
