@@ -140,7 +140,7 @@ fn main() -> Result<(), Error> {
             } else {
                 SealBundle::new()
             };
-            let signed_block = block.to_signed_block(vec![(s)], &seal_bundle);
+            let signed_block = block.to_signed_block(vec![(s)]);
             let m = microledger.anchor(signed_block)?;
             println!("{}", serde_json::to_string(&m).unwrap());
         } else {

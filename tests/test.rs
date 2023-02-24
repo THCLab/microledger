@@ -35,7 +35,7 @@ fn test() -> Result<(), Error> {
     // Sign block, attach signature and seal provider.
     let signature_raw = sk.sign_ed(&block.serialize()).unwrap();
     let s = Signature::SelfSigning(SelfSigningPrefix::Ed25519Sha512(signature_raw));
-    let signed_block = block.to_signed_block(vec![s], &seal_bundle);
+    let signed_block = block.to_signed_block(vec![s]);
 
     // Attach block to microledger.
     microledger = microledger.anchor(signed_block)?;
@@ -55,7 +55,7 @@ fn test() -> Result<(), Error> {
     let signature_raw = wrong_sk.sign_ed(&block0.serialize()).unwrap();
     let s = Signature::SelfSigning(SelfSigningPrefix::Ed25519Sha512(signature_raw));
 
-    let signed_block0 = block0.to_signed_block(vec![s], &seal_bundle);
+    let signed_block0 = block0.to_signed_block(vec![s]);
     let result = microledger.anchor(signed_block0);
     assert!(result.is_err());
     assert_eq!(1, microledger.blocks.len());
@@ -65,7 +65,7 @@ fn test() -> Result<(), Error> {
 
     let signature_raw = sk.sign_ed(&block1.serialize()).unwrap();
     let s = Signature::SelfSigning(SelfSigningPrefix::Ed25519Sha512(signature_raw));
-    let signed_block1 = block1.to_signed_block(vec![s], &seal_bundle);
+    let signed_block1 = block1.to_signed_block(vec![s]);
     let microledger0 = microledger.anchor(signed_block1)?;
 
     assert_eq!(2, microledger0.blocks.len());
@@ -82,7 +82,7 @@ fn test() -> Result<(), Error> {
 
     let signature_raw = sk.sign_ed(&block2.serialize()).unwrap();
     let s = Signature::SelfSigning(SelfSigningPrefix::Ed25519Sha512(signature_raw));
-    let signed_block2 = block2.to_signed_block(vec![s], &seal_bundle);
+    let signed_block2 = block2.to_signed_block(vec![s]);
     let microledger1 = microledger.anchor(signed_block2)?;
 
     assert_eq!(2, microledger1.blocks.len());
@@ -98,7 +98,7 @@ fn test() -> Result<(), Error> {
 
     let signature_raw = nnsk.sign_ed(&block3.serialize()).unwrap();
     let s = Signature::SelfSigning(SelfSigningPrefix::Ed25519Sha512(signature_raw));
-    let signed_block2 = block3.to_signed_block(vec![s], &seal_bundle);
+    let signed_block2 = block3.to_signed_block(vec![s]);
     let microledger2 = microledger1.anchor(signed_block2)?;
 
     assert_eq!(3, microledger2.blocks.len());

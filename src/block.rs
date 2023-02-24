@@ -45,13 +45,13 @@ impl Block {
     pub fn to_signed_block(
         self,
         signatures: Vec<Signature>,
-        seal_bundle: &SealBundle,
+        // seal_bundle: &SealBundle,
     ) -> SignedBlock {
-        let attachement = seal_bundle.get_attachement();
+        // let attachement = seal_bundle.get_attachement();
         SignedBlock {
             block: self,
             signatures,
-            attached_seal: attachement,
+            // attached_seal: attachement,
         }
     }
 }
@@ -68,15 +68,15 @@ impl Block {
     }
 }
 
-#[derive(Clone, Serialize, Deserialize)]
+#[derive(Clone, Serialize, Deserialize, Debug)]
 pub struct SignedBlock {
     #[serde(rename = "bl")]
     pub block: Block,
     #[serde(rename = "si")]
     pub signatures: Vec<Signature>,
     // TODO should be vec in the future
-    #[serde(rename = "at")]
-    pub attached_seal: BlockAttachment,
+    // #[serde(rename = "at")]
+    // pub attached_seal: BlockAttachment,
 }
 
 // Checks if signed block matches the given block.
@@ -95,26 +95,26 @@ impl SignedBlock {
     }
 
     pub fn check_block(&self, block: Option<&Block>) -> Result<bool> {
-        Ok(self.block.check_previous(block)? && self.check_seals()?)
+        Ok(self.block.check_previous(block)?)// && self.check_seals()?)
     }
 
-    fn check_seals(&self) -> Result<bool> {
-        // check if seal of given hash exists in block attachement
-        if self
-            .block
-            .seals
-            .iter()
-            // TODO check all seals
-            .filter(|s| matches!(s, Seal::Attached(_)))
-            .all(|s| self.attached_seal.clone().get(&s.fingerprint()).is_some())
-        {
-            Ok(true)
-        } else {
-            Err(Error::BlockError(
-                "anchored data doesn't exist in seal provider".into(),
-            ))
-        }
-    }
+    // fn check_seals(&self) -> Result<bool> {
+    //     // check if seal of given hash exists in block attachement
+    //     if self
+    //         .block
+    //         .seals
+    //         .iter()
+    //         // TODO check all seals
+    //         .filter(|s| matches!(s, Seal::Attached(_)))
+    //         .all(|s| self.attached_seal.clone().get(&s.fingerprint()).is_some())
+    //     {
+    //         Ok(true)
+    //     } else {
+    //         Err(Error::BlockError(
+    //             "anchored data doesn't exist in seal provider".into(),
+    //         ))
+    //     }
+    // }
 }
 
 #[cfg(test)]
