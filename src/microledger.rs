@@ -1,8 +1,9 @@
 use serde::{Deserialize, Serialize};
 
+use crate::Encode;
 use crate::error::Error;
 use crate::seal_bundle::SealBundle;
-use crate::Serialization;
+use crate::signature::{Verify, KeriSignature};
 use crate::{
     block::{Block, SignedBlock},
     controlling_identifier::ControllingIdentifier,
@@ -12,20 +13,19 @@ use crate::{
 pub type Result<T> = std::result::Result<T, Error>;
 
 #[derive(Default, Serialize, Deserialize, Debug)]
-pub struct MicroLedger {
+pub struct MicroLedger<S: Verify + Serialize> {
     #[serde(rename = "bs")]
-    pub blocks: Vec<SignedBlock>,
+    pub blocks: Vec<SignedBlock<S>>,
 }
 
-impl MicroLedger {
+impl<S: Verify + Serialize +  Clone> MicroLedger<S> {
     pub fn new() -> Self {
         MicroLedger { blocks: vec![] }
     }
 
-    pub fn append_block(&self, signed_block: SignedBlock) -> Result<MicroLedger> {
-        let mut blocks = self.blocks.clone();
-        blocks.append(&mut vec![signed_block]);
-        Ok(Self { blocks })
+    pub fn append_block(&mut self, signed_block: SignedBlock<S>) -> Result<()> {
+        self.blocks.append(&mut vec![signed_block]);
+        Ok(())
     }
 
     pub fn pre_anchor_block(
@@ -36,13 +36,13 @@ impl MicroLedger {
         let prev = self
             .blocks
             .last()
-            .map(|sb| DigitalFingerprint::derive(&Serialization::serialize(&sb.block)));
+            .map(|sb| DigitalFingerprint::derive(&Encode::encode(&sb.block)));
 
         let seals = seal_bundle.get_fingerprints();
         Block::new(seals, prev, controlling_identifiers)
     }
 
-    pub fn anchor(&self, block: SignedBlock) -> Result<Self> {
+    pub fn anchor(&mut self, block: SignedBlock<S>) -> Result<()> {
         let last = self.get_last_block();
         // Checks block binding and signatures.
         if block.check_block(last)? && block.verify(self.current_controlling_identifiers()?)? {
@@ -60,9 +60,8 @@ impl MicroLedger {
     fn at(&self, block_id: &DigitalFingerprint) -> Option<Self> {
         let position = self
             .blocks
-            .clone()
             .iter()
-            .position(|b| block_id.verify_binding(&Serialization::serialize(&b.block)));
+            .position(|b| block_id.verify_binding(&Encode::encode(&b.block)));
         // .take_while(|b| !block_id.verify_binding(&Serialization::serialize(&b.block))).collect();
         let blocks: Vec<_> = self
             .blocks
@@ -83,16 +82,15 @@ impl MicroLedger {
     pub fn get_block(&self, fingerprint: DigitalFingerprint) -> Result<Block> {
         self.blocks
             .iter()
-            .find(|b| fingerprint.verify_binding(&Serialization::serialize(&b.block)))
+            .find(|b| fingerprint.verify_binding(&Encode::encode(&b.block)))
             .map(|b| b.block.clone())
             .ok_or_else(|| Error::MicroError("No block of given fingerprint".into()))
     }
 
-    fn get_block_by_fingerprint(&self, fingerprint: &DigitalFingerprint) -> Result<SignedBlock> {
+    fn get_block_by_fingerprint(&self, fingerprint: &DigitalFingerprint) -> Result<&SignedBlock<S>> {
         self.blocks
-            .clone()
-            .into_iter()
-            .find(|b| fingerprint.verify_binding(&Serialization::serialize(&b.block)))
+            .iter()
+            .find(|b| fingerprint.verify_binding(&Encode::encode(&b.block)))
             .ok_or_else(|| Error::MicroError("No block of given fingerprint".into()))
     }
 
@@ -111,6 +109,22 @@ impl MicroLedger {
     //         .collect();
     //     found_data
     // }
+} 
+impl MicroLedger<KeriSignature> {
+    pub fn from_cesr(stream: &[u8]) -> Result<Self> {
+        let (rest, parsed_stream) = cesrox::parse_many(stream).unwrap();
+        let mut microledger = MicroLedger::new();
+        parsed_stream.into_iter().for_each(|pd| microledger.append_block(pd.into()).unwrap());
+        Ok(microledger)
+    }
+
+    pub fn to_cesr(&self) -> Result<Vec<u8>> {
+        Ok(self.blocks
+            .iter()
+            .map(|bl| bl.to_cesr().unwrap())
+            .flatten()
+            .collect())
+    }
 }
 
 #[cfg(test)]
@@ -120,20 +134,19 @@ pub mod test {
     use ed25519_dalek::ExpandedSecretKey;
     use keri::{prefix::{BasicPrefix, SelfSigningPrefix}, keys::PublicKey};
     use rand::rngs::OsRng;
-    use sai::derivation::SelfAddressing;
 
-    use crate::{block::{Block, SignedBlock}, digital_fingerprint::DigitalFingerprint, microledger::MicroLedger, controlling_identifier::ControllingIdentifier, seals::Seal, Serialization, seal_bundle::{SealBundle, SealData}, signature::KeriSignature};
+    use crate::{block::{Block, SignedBlock}, digital_fingerprint::DigitalFingerprint, microledger::MicroLedger, controlling_identifier::ControllingIdentifier, seals::Seal, seal_bundle::{SealBundle, SealData}, signature::KeriSignature, Encode};
 
      #[test]
     fn test_microledger() {
         // generate keypair
         let kp = ed25519_dalek::Keypair::generate(&mut OsRng {});
         let (pk, sk) = (kp.public, kp.secret);
-        let bp = ControllingIdentifier::Basic(BasicPrefix::Ed25519(PublicKey::new(
-            pk.as_bytes().to_vec(),
-        )));
 
-        let microledger = MicroLedger::new();
+        let pref = BasicPrefix::Ed25519(PublicKey::new(pk.as_bytes().to_vec()));
+        let bp = ControllingIdentifier::Keri(keri::prefix::IdentifierPrefix::Basic(pref.clone()));
+
+        let mut microledger = MicroLedger::new();
         let seals = SealBundle::new().attach(SealData::AttachedData("hello".into()));
         let block = microledger.pre_anchor_block(vec![(bp.clone())], &seals);
 
@@ -144,11 +157,25 @@ pub mod test {
             .to_vec()
         };
 
-        let signatures = KeriSignature::SelfSigning(SelfSigningPrefix::new(SelfSigning::Ed25519Sha512, sign(&block.serialize())));
+        let signatures = KeriSignature::Nontransferable(pref.clone(), SelfSigningPrefix::new(SelfSigning::Ed25519Sha512, sign(&block.encode())));
         let signed = block.to_signed_block(vec![signatures]);
-        let microledger = microledger.anchor(signed).unwrap();
+        microledger.anchor(signed).unwrap();
 
         let seals = SealBundle::new().attach(SealData::AttachedData("hello".into()));
+        let block = microledger.pre_anchor_block(vec![(bp.clone())], &seals);
+
+        let sign = |data| {
+            ExpandedSecretKey::from(&sk)
+            .sign(data, &pk)
+            .as_ref()
+            .to_vec()
+        };
+
+        let signatures = KeriSignature::Nontransferable(pref.clone(), SelfSigningPrefix::new(SelfSigning::Ed25519Sha512, sign(&block.encode())));
+        let signed = block.to_signed_block(vec![signatures]);
+        microledger.anchor(signed).unwrap();
+
+         let seals = SealBundle::new().attach(SealData::AttachedData("hello".into()));
         let block = microledger.pre_anchor_block(vec![(bp)], &seals);
 
         let sign = |data| {
@@ -158,28 +185,25 @@ pub mod test {
             .to_vec()
         };
 
-        let signatures = KeriSignature::SelfSigning(SelfSigningPrefix::new(SelfSigning::Ed25519Sha512, sign(&block.serialize())));
+        let signatures = KeriSignature::Nontransferable(pref, SelfSigningPrefix::new(SelfSigning::Ed25519Sha512, sign(&block.encode())));
         let signed = block.to_signed_block(vec![signatures]);
-        let microledger = microledger.anchor(signed).unwrap();
+        microledger.anchor(signed).unwrap();
 
-        let blocks = microledger.blocks;
-        println!("{}", serde_json::to_string(&blocks).unwrap());
+        // let blocks = microledger.blocks;
+        // println!("{}", serde_json::to_string(&blocks).unwrap());
+        println!("{}", String::from_utf8(microledger.to_cesr().unwrap()).unwrap());
 
     }
 
     #[test]
     fn test_microledger_traversing() {
-        let serialized_microledger = r#"{"bs":[
-            {"bl":{"s":["AELw56P7ccBSkFj-THMErcH7RFX2Ph1fDUfQ1ErEmDuD4"],"ci":["ADzfIfArvcpqlhWPWALcqnf_VtQ4gX9Bg_av9e4dB7ciI"]},"si":["A0B_vrdVGJ19PJkIWT4KIJ2vnUAMUNS-T-A2FC3r1oWE84sBd0t3QFt3iAWtLq9TZ9ecHe_G6VX1y5oVQDDLFijCw"],"at":{"attachements":{"ELw56P7ccBSkFj-THMErcH7RFX2Ph1fDUfQ1ErEmDuD4":"some message"}}},
-            {"bl":{"s":["AE6AVF6hEJH0NS-bTZvfKac9EIDXfmpVSTzvzyKGGmn9I"],"p":"AEa57Kf0zAZaVEO3cuWXEe2ihPA_i4FVq3PCyDNtVitgg","ci":["ADjdeUHPIYwMDlZJs0cfE60NDN2R4Eb9OmtKuNCmORWdI"]},"si":["A0B62_hffohOXC7luK-h3TwEfUGD4BpEX8kjEXwFpGA-I3BBjG11IslWD2umDZubf1a-XmQZxgwdQB0UPIf5MkuDg"],"at":{"attachements":{"E6AVF6hEJH0NS-bTZvfKac9EIDXfmpVSTzvzyKGGmn9I":"one more message"}}},
-            {"bl":{"s":["AEJLZcnDF6gCZdODVgYOczNCluO3CkJa0yONOkXvXiVO8"],"p":"AEhvkz6v16nXuA9cD0yvkqPAcLJd1ajjiTGlWO9WfJZM4","ci":["ADZdoBkHaXfWqe63hMDgi2KG2CLAx3nJ6rjSn_aUxKd4w"]},"si":["A0B_gymZvjym-bC2a-n4Kx_FEszNllgxNJwYe0SuDpwWX8vtXAzJGJ5OZZxbHPrgfKwfiWHMNE_pVmzB1TjK8XUCw"],"at":{"attachements":{"EJLZcnDF6gCZdODVgYOczNCluO3CkJa0yONOkXvXiVO8":"again, one more message"}}}
-        ]}"#;
+        let serialized_microledger = r#"{"s":["AEOqPFj2zhoKSXkSRxeWNS7NQbvjBTreKhukIxWJKZyAP"],"ci":["DDSJCC9yQkd62kcQk-iW9xA20mgrCrTfWffDiGE_H-_N"]}-CABDDSJCC9yQkd62kcQk-iW9xA20mgrCrTfWffDiGE_H-_N0BA3mV0Ga-e3Ly2yAy2w9PgUbrgglzuDFBh8TQXal1zQlsOYFxWf3x6uqpiVpuiKMddnmMEWGF0iTFgrw07UGSYO{"s":["AEOqPFj2zhoKSXkSRxeWNS7NQbvjBTreKhukIxWJKZyAP"],"p":"AEL_OPgFBnvQ45jaVqygWfEDbdkaPaC_x81yhh8nOmerL","ci":["DDSJCC9yQkd62kcQk-iW9xA20mgrCrTfWffDiGE_H-_N"]}-CABDDSJCC9yQkd62kcQk-iW9xA20mgrCrTfWffDiGE_H-_N0BDQb_cVMsBGFgtxj5JakS1icx3ubheCOvth4U-c9hRsL38msumM7xJHmaTXpCNcNTDRtNw8tS6O5Ki9EuAKxecD{"s":["AEOqPFj2zhoKSXkSRxeWNS7NQbvjBTreKhukIxWJKZyAP"],"p":"AEP-tb9xGrwyHlm_ekDIQIAsvj2lp_el0p2zfUcXEM30I","ci":["DDSJCC9yQkd62kcQk-iW9xA20mgrCrTfWffDiGE_H-_N"]}-CABDDSJCC9yQkd62kcQk-iW9xA20mgrCrTfWffDiGE_H-_N0BDYbWMxzpoec8aYKe0kdE9bUoBizBQZ1R8kZiFbyA9P2iXH5LBaMj9vrbZSxlWQspPfDIDlsitrEYkxuYjc4oQG"#;
 
-        let deserialize_microledger: MicroLedger =
-            serde_json::from_str(serialized_microledger).unwrap();
+        let deserialize_microledger  =
+            MicroLedger::<KeriSignature>::from_cesr(serialized_microledger.as_bytes()).unwrap();
         assert_eq!(3, deserialize_microledger.blocks.len());
 
-        let second_block_id: DigitalFingerprint = "AEhvkz6v16nXuA9cD0yvkqPAcLJd1ajjiTGlWO9WfJZM4"
+        let second_block_id: DigitalFingerprint = "AEP-tb9xGrwyHlm_ekDIQIAsvj2lp_el0p2zfUcXEM30I"
             .parse()
             .unwrap();
 
@@ -189,7 +213,7 @@ pub mod test {
 
         // test `get_last_block`
         let last = deserialize_microledger.get_last_block().unwrap().clone();
-        let sed_last = r#"{"s":["AEJLZcnDF6gCZdODVgYOczNCluO3CkJa0yONOkXvXiVO8"],"p":"AEhvkz6v16nXuA9cD0yvkqPAcLJd1ajjiTGlWO9WfJZM4","ci":["ADZdoBkHaXfWqe63hMDgi2KG2CLAx3nJ6rjSn_aUxKd4w"]}"#;
+        let sed_last = r#"{"s":["AEOqPFj2zhoKSXkSRxeWNS7NQbvjBTreKhukIxWJKZyAP"],"p":"AEP-tb9xGrwyHlm_ekDIQIAsvj2lp_el0p2zfUcXEM30I","ci":["DDSJCC9yQkd62kcQk-iW9xA20mgrCrTfWffDiGE_H-_N"]}"#;
         let block: Block = serde_json::from_str(sed_last).unwrap();
         assert_eq!(last, block);
 

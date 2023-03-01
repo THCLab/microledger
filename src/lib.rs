@@ -2,7 +2,7 @@ pub mod block;
 pub mod controlling_identifier;
 pub mod digital_fingerprint;
 pub mod error;
-// pub mod microledger;
+pub mod microledger;
 pub mod seal_bundle;
 pub mod seals;
 pub mod signature;

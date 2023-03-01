@@ -62,6 +62,7 @@ impl Block {
     }
 }
 
+#[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct SignedBlock<S: Verify> {
     pub block: Block,
     pub signatures: Vec<S>,
@@ -112,6 +113,12 @@ impl SignedBlock<KeriSignature> {
 
     pub fn from_cesr(stream: &[u8]) -> Result<Self> {
         let (_rest, parsed) = parse(stream).unwrap();
+        Ok(parsed.into())
+    }
+}
+
+impl From<ParsedData> for SignedBlock<KeriSignature> {
+    fn from(parsed: ParsedData) -> Self {
         let block: Block = match parsed.payload {
             Payload::JSON(json) => serde_json::from_slice(&json).unwrap(),
             Payload::CBOR(_) => todo!(),
@@ -126,7 +133,7 @@ impl SignedBlock<KeriSignature> {
             })
             .flatten()
             .collect();
-        Ok(block.to_signed_block(signatures))
+        block.to_signed_block(signatures)
     }
 }
 
