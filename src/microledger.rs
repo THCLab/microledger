@@ -122,7 +122,7 @@ pub mod test {
     use rand::rngs::OsRng;
     use sai::derivation::SelfAddressing;
 
-    use crate::{block::{Block, SignedBlock}, digital_fingerprint::DigitalFingerprint, microledger::MicroLedger, controlling_identifier::ControllingIdentifier, seals::Seal, Serialization, seal_bundle::{SealBundle, SealData}, signature::Signature};
+    use crate::{block::{Block, SignedBlock}, digital_fingerprint::DigitalFingerprint, microledger::MicroLedger, controlling_identifier::ControllingIdentifier, seals::Seal, Serialization, seal_bundle::{SealBundle, SealData}, signature::KeriSignature};
 
      #[test]
     fn test_microledger() {
@@ -144,7 +144,7 @@ pub mod test {
             .to_vec()
         };
 
-        let signatures = Signature::SelfSigning(SelfSigningPrefix::new(SelfSigning::Ed25519Sha512, sign(&block.serialize())));
+        let signatures = KeriSignature::SelfSigning(SelfSigningPrefix::new(SelfSigning::Ed25519Sha512, sign(&block.serialize())));
         let signed = block.to_signed_block(vec![signatures]);
         let microledger = microledger.anchor(signed).unwrap();
 
@@ -158,7 +158,7 @@ pub mod test {
             .to_vec()
         };
 
-        let signatures = Signature::SelfSigning(SelfSigningPrefix::new(SelfSigning::Ed25519Sha512, sign(&block.serialize())));
+        let signatures = KeriSignature::SelfSigning(SelfSigningPrefix::new(SelfSigning::Ed25519Sha512, sign(&block.serialize())));
         let signed = block.to_signed_block(vec![signatures]);
         let microledger = microledger.anchor(signed).unwrap();
 

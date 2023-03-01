@@ -1,10 +1,11 @@
 use std::{fmt::Display, str::FromStr};
 
-use cesrox::primitives::CesrPrimitive;
-use keri::prefix::BasicPrefix;
+use cesrox::primitives::{
+    codes::basic::Basic, parsers::parse_primitive, CesrPrimitive, IdentifierCode, PublicKey,
+};
+use keri::prefix::{BasicPrefix, IdentifierPrefix};
 use serde::{Deserialize, Deserializer, Serialize, Serializer};
 
-use crate::{error::Error, signature::Signature};
 
 /// Controlling identifier describes control authority over the Microledger in a given block.
 /// Control _MAY_ be established for single or multiple identifiers through the multisig feature.
@@ -12,21 +13,22 @@ use crate::{error::Error, signature::Signature};
 /// ie. `Public Key`, `DID`, `KERI` prefix and so on.
 #[derive(Clone, Debug, PartialEq)]
 pub enum ControllingIdentifier {
-    Basic(BasicPrefix),
+    // Basic(BasicPrefix),
+    Keri(IdentifierPrefix),
 }
 
 impl ControllingIdentifier {
-    pub fn check_signatures(&self, msg: &[u8], signatures: &[Signature]) -> Result<bool, Error> {
-        match self {
-            Self::Basic(id) => Ok(signatures.iter().any(|s| s.verify_with(msg, id).unwrap())),
-        }
-    }
+    // pub fn check_signatures(&self, msg: &[u8], signatures: &[KeriSignature]) -> Result<bool, Error> {
+    //     match self {
+    //         Self::Basic(id) => Ok(signatures.iter().any(|s| s.verify_with(msg, id).unwrap())),
+    //     }
+    // }
 }
 
 impl Display for ControllingIdentifier {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
-            ControllingIdentifier::Basic(id) => write!(f, "A{}", id.to_str()),
+            ControllingIdentifier::Keri(id) => write!(f, "{}", id.to_str()),
         }
     }
 }
@@ -35,12 +37,10 @@ impl FromStr for ControllingIdentifier {
     type Err = keri::error::Error;
 
     fn from_str(s: &str) -> Result<Self, Self::Err> {
-        match s.get(..1).zip(s.get(1..)) {
-            Some(("A", id)) => Ok(Self::Basic(id.parse()?)),
-            _ => Err(keri::error::Error::DeserializeError(
-                "Unknown prefix".into(),
-            )),
-        }
+        let (_rest, (code, value)) = parse_primitive::<Basic>(s.as_bytes()).unwrap();
+        let c = BasicPrefix::new(code, keri::keys::PublicKey::new(value));
+
+        Ok(Self::Keri(IdentifierPrefix::Basic(c)))
     }
 }
 
