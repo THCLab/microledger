@@ -9,7 +9,7 @@ use crate::{
     error::Error,
     seals::Seal,
     signature::{KeriSignature, Verify, ToCesr, KeriSignatures},
-    Serialization,
+    Encode,
 };
 pub type Result<T> = std::result::Result<T, Error>;
 
@@ -23,8 +23,8 @@ pub struct Block {
     pub controlling_identifiers: Vec<ControllingIdentifier>,
 }
 
-impl Serialization for Block {
-    fn serialize(&self) -> Vec<u8> {
+impl Encode for Block {
+    fn encode(&self) -> Vec<u8> {
         serde_json::to_string(self).unwrap().as_bytes().to_vec()
     }
 }
@@ -54,7 +54,7 @@ impl Block {
     fn check_previous(&self, previous_block: Option<&Block>) -> Result<bool> {
         match self.previous {
             Some(ref prev) => match previous_block {
-                Some(block) => Ok(prev.verify_binding(&Serialization::serialize(block))),
+                Some(block) => Ok(prev.verify_binding(&Encode::encode(block))),
                 None => Err(Error::BlockError("Incorect blocks binding".into())),
             },
             None => Ok(previous_block.is_none()),
@@ -82,7 +82,7 @@ impl<S: Verify> SignedBlock<S> {
         // TODO
         // Check controlling identifiers
         Ok(self.signatures.iter().all(|sig| {
-            match sig.verify(Serialization::serialize(&self.block)) {
+            match sig.verify(Encode::encode(&self.block)) {
                 Ok(_) => true,
                 Err(_) => false,
             }
@@ -96,7 +96,7 @@ impl<S: Verify> SignedBlock<S> {
 }
 impl SignedBlock<KeriSignature> {
     pub fn to_cesr(&self) -> Result<Vec<u8>> {
-        let payload = Payload::JSON(Serialization::serialize(&self.block));
+        let payload = Payload::JSON(Encode::encode(&self.block));
         let att: Vec<cesrox::group::Group> = self
             .signatures
             .iter()
@@ -147,7 +147,7 @@ pub mod test {
         digital_fingerprint::DigitalFingerprint,
         seals::Seal,
         signature::KeriSignature,
-        Serialization,
+        Encode,
     };
 
     #[test]
@@ -164,10 +164,10 @@ pub mod test {
             SelfAddressing::Blake3_256.derive("exmaple".as_bytes()),
         ));
         let block = Block::new(vec![Seal::Attached(seal)], prev, vec![(bp)]);
-        println!("{}", String::from_utf8(block.serialize()).unwrap());
+        println!("{}", String::from_utf8(block.encode()).unwrap());
 
-        let deserialized_block: Block = serde_json::from_slice(&block.serialize()).unwrap();
-        assert_eq!(block.serialize(), deserialized_block.serialize());
+        let deserialized_block: Block = serde_json::from_slice(&block.encode()).unwrap();
+        assert_eq!(block.encode(), deserialized_block.encode());
     }
 
     #[test]
@@ -192,7 +192,7 @@ pub mod test {
 
         let sig = KeriSignature::Nontransferable(
             pref,
-            SelfSigningPrefix::new(SelfSigning::Ed25519Sha512, sign(&block.serialize())),
+            SelfSigningPrefix::new(SelfSigning::Ed25519Sha512, sign(&block.encode())),
         );
 
         let signed = block.to_signed_block(vec![sig]);

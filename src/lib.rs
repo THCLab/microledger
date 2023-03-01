@@ -9,8 +9,8 @@ pub mod signature;
 
 pub trait Encoding {}
 
-pub trait Serialization {
-    fn serialize(&self) -> Vec<u8>;
+pub trait Encode {
+    fn encode(&self) -> Vec<u8>;
 }
 
 #[cfg(test)]
