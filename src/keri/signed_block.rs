@@ -1,24 +1,21 @@
 use cesrox::{parse, payload::Payload, ParsedData};
+use keri::event_message::signature::{get_signatures, signatures_into_groups};
+use keri::prefix::IdentifierPrefix;
 
 use crate::block::Block;
 use crate::microledger::Result;
 use crate::{block::SignedBlock, Encode};
 
-use super::controlling_identifier::ControllingIdentifier;
-use super::signature::{KeriSignature, KeriSignatures, ToCesr};
+use super::KeriSignature;
 
-impl SignedBlock<ControllingIdentifier, KeriSignature> {
+impl SignedBlock<IdentifierPrefix, KeriSignature> {
     pub fn to_cesr(&self) -> Result<Vec<u8>> {
         let payload = Payload::JSON(Encode::encode(&self.block));
-        let att: Vec<cesrox::group::Group> = self
-            .signatures
-            .iter()
-            .map(|a| a.to_cesr_attachment())
-            .collect::<Result<_>>()
-            .unwrap();
+        let groups = signatures_into_groups(&self.signatures);
+
         let d = ParsedData {
             payload,
-            attachments: att,
+            attachments: groups,
         };
         Ok(d.to_cesr().unwrap())
     }
@@ -29,9 +26,9 @@ impl SignedBlock<ControllingIdentifier, KeriSignature> {
     }
 }
 
-impl From<ParsedData> for SignedBlock<ControllingIdentifier, KeriSignature> {
+impl From<ParsedData> for SignedBlock<IdentifierPrefix, KeriSignature> {
     fn from(parsed: ParsedData) -> Self {
-        let block: Block<ControllingIdentifier> = match parsed.payload {
+        let block: Block<IdentifierPrefix> = match parsed.payload {
             Payload::JSON(json) => serde_json::from_slice(&json).unwrap(),
             Payload::CBOR(_) => todo!(),
             Payload::MGPK(_) => todo!(),
@@ -39,10 +36,7 @@ impl From<ParsedData> for SignedBlock<ControllingIdentifier, KeriSignature> {
         let signatures: Vec<_> = parsed
             .attachments
             .into_iter()
-            .map(|g| {
-                let s: KeriSignatures = g.into();
-                s.0
-            })
+            .map(|g| get_signatures(g).unwrap())
             .flatten()
             .collect();
         block.to_signed_block(signatures)

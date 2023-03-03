@@ -1,19 +1,24 @@
 use std::sync::Arc;
 
+use keri::prefix::IdentifierPrefix;
+
 use crate::{
     microledger::{MicroLedger, Result},
     verifier::Verifier,
+    Identifier,
 };
 
-use self::{controlling_identifier::ControllingIdentifier, signature::KeriSignature};
-
-pub mod controlling_identifier;
-pub mod signature;
 pub mod signed_block;
 pub mod verifier;
 
-#[cfg(feature = "keri")]
-impl<V: Verifier<Signature = KeriSignature>> MicroLedger<KeriSignature, V, ControllingIdentifier> {
+pub type KeriSignature = keri::event_message::signature::Signature;
+
+impl Identifier for IdentifierPrefix {}
+
+impl<V> MicroLedger<KeriSignature, V, IdentifierPrefix>
+where
+    V: Verifier<Signature = KeriSignature>,
+{
     pub fn new_from_cesr(stream: &[u8], verifier: Arc<V>) -> Result<Self> {
         let (_rest, parsed_stream) = cesrox::parse_many(stream).unwrap();
         let mut microledger = MicroLedger::new(verifier);

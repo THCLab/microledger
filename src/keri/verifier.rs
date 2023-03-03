@@ -1,13 +1,10 @@
 use std::sync::Arc;
 
-use keri::{
-    database::SledEventDatabase, event::sections::seal::EventSeal,
-    event_message::signature::Nontransferable, processor::validator::EventValidator,
-};
+use keri::{database::SledEventDatabase, processor::validator::EventValidator};
 
 use crate::{microledger::Result, verifier::Verifier};
 
-use super::signature::KeriSignature;
+use super::KeriSignature;
 
 pub struct KeriVerifier(EventValidator);
 
@@ -17,25 +14,6 @@ impl Verifier for KeriVerifier {
     fn verify(&self, data: &[u8], s: Vec<Self::Signature>) -> Result<bool> {
         Ok(s.into_iter()
             .all(|sig| self.0.verify(data, &sig.into()).is_ok()))
-    }
-}
-
-impl Into<keri::event_message::signature::Signature> for KeriSignature {
-    fn into(self) -> keri::event_message::signature::Signature {
-        use keri::event_message::signature::{Signature, SignerData};
-        match self {
-            KeriSignature::Transferable(id, sn, dig, sigs) => Signature::Transferable(
-                SignerData::EventSeal(EventSeal {
-                    prefix: id,
-                    sn,
-                    event_digest: dig,
-                }),
-                sigs.into_iter().map(|s| s.into()).collect(),
-            ),
-            KeriSignature::Nontransferable(bp, ssp) => {
-                Signature::NonTransferable(Nontransferable::Couplet(vec![(bp, ssp)]))
-            }
-        }
     }
 }
 
@@ -54,8 +32,9 @@ pub mod test {
     use ed25519_dalek::ExpandedSecretKey;
     use keri::{
         database::SledEventDatabase,
+        event_message::signature::Nontransferable,
         keys::PublicKey,
-        prefix::{BasicPrefix, SelfSigningPrefix},
+        prefix::{BasicPrefix, IdentifierPrefix, SelfSigningPrefix},
         processor::basic_processor::BasicProcessor,
     };
     use rand::rngs::OsRng;
@@ -65,10 +44,7 @@ pub mod test {
     use crate::{
         block::{Block, SignedBlock},
         digital_fingerprint::DigitalFingerprint,
-        keri::{
-            controlling_identifier::ControllingIdentifier, signature::KeriSignature,
-            verifier::KeriVerifier,
-        },
+        keri::{verifier::KeriVerifier, KeriSignature},
         microledger::MicroLedger,
         seal_bundle::{SealBundle, SealData},
         seals::Seal,
@@ -77,7 +53,6 @@ pub mod test {
 
     #[test]
     fn test_signed_block() {
-        #[cfg(feature = "keri")]
         use crate::keri::verifier::KeriVerifier;
         let root = Builder::new().prefix("test-db").tempdir().unwrap();
         let db = Arc::new(SledEventDatabase::new(root.path()).unwrap());
@@ -88,7 +63,7 @@ pub mod test {
         let kp = ed25519_dalek::Keypair::generate(&mut OsRng {});
         let (pk, sk) = (kp.public, kp.secret);
         let pref = BasicPrefix::Ed25519(PublicKey::new(pk.as_bytes().to_vec()));
-        let bp = ControllingIdentifier::Keri(keri::prefix::IdentifierPrefix::Basic(pref.clone()));
+        let bp = keri::prefix::IdentifierPrefix::Basic(pref.clone());
 
         let sign = |data| {
             ExpandedSecretKey::from(&sk)
@@ -102,10 +77,10 @@ pub mod test {
         ));
         let block = Block::new(vec![Seal::Attached(seal)], prev, vec![(bp)]);
 
-        let sig = KeriSignature::Nontransferable(
+        let sig = KeriSignature::NonTransferable(Nontransferable::Couplet(vec![(
             pref,
             SelfSigningPrefix::new(SelfSigning::Ed25519Sha512, sign(&block.encode())),
-        );
+        )]));
 
         let signed = block.to_signed_block(vec![sig]);
         assert!(signed.verify(validator, None).unwrap());
@@ -113,8 +88,7 @@ pub mod test {
         let signed_block_cesr = signed.to_cesr().unwrap();
 
         let block_from_cesr =
-            SignedBlock::<ControllingIdentifier, KeriSignature>::from_cesr(&signed_block_cesr)
-                .unwrap();
+            SignedBlock::<IdentifierPrefix, KeriSignature>::from_cesr(&signed_block_cesr).unwrap();
         assert_eq!(block_from_cesr.block, signed.block);
         assert_eq!(block_from_cesr.signatures, signed.signatures);
     }
@@ -131,7 +105,7 @@ pub mod test {
         let (pk, sk) = (kp.public, kp.secret);
 
         let pref = BasicPrefix::Ed25519(PublicKey::new(pk.as_bytes().to_vec()));
-        let bp = ControllingIdentifier::Keri(keri::prefix::IdentifierPrefix::Basic(pref.clone()));
+        let bp = keri::prefix::IdentifierPrefix::Basic(pref.clone());
 
         let mut microledger = MicroLedger::new(validator);
         let seals = SealBundle::new().attach(SealData::AttachedData("hello".into()));
@@ -144,10 +118,11 @@ pub mod test {
                 .to_vec()
         };
 
-        let signatures = KeriSignature::Nontransferable(
+        let signatures = KeriSignature::NonTransferable(Nontransferable::Couplet(vec![(
             pref.clone(),
             SelfSigningPrefix::new(SelfSigning::Ed25519Sha512, sign(&block.encode())),
-        );
+        )]));
+
         let signed = block.to_signed_block(vec![signatures]);
         microledger.anchor(signed).unwrap();
 
@@ -161,10 +136,11 @@ pub mod test {
                 .to_vec()
         };
 
-        let signatures = KeriSignature::Nontransferable(
+        let signatures = KeriSignature::NonTransferable(Nontransferable::Couplet(vec![(
             pref.clone(),
             SelfSigningPrefix::new(SelfSigning::Ed25519Sha512, sign(&block.encode())),
-        );
+        )]));
+
         let signed = block.to_signed_block(vec![signatures]);
         microledger.anchor(signed).unwrap();
 
@@ -178,10 +154,11 @@ pub mod test {
                 .to_vec()
         };
 
-        let signatures = KeriSignature::Nontransferable(
+        let signatures = KeriSignature::NonTransferable(Nontransferable::Couplet(vec![(
             pref,
             SelfSigningPrefix::new(SelfSigning::Ed25519Sha512, sign(&block.encode())),
-        );
+        )]));
+
         let signed = block.to_signed_block(vec![signatures]);
         microledger.anchor(signed).unwrap();
 
@@ -220,7 +197,7 @@ pub mod test {
         // test `get_last_block`
         let last = deserialize_microledger.get_last_block().unwrap().clone();
         let sed_last = r#"{"s":["AEOqPFj2zhoKSXkSRxeWNS7NQbvjBTreKhukIxWJKZyAP"],"p":"AEP-tb9xGrwyHlm_ekDIQIAsvj2lp_el0p2zfUcXEM30I","ci":["DDSJCC9yQkd62kcQk-iW9xA20mgrCrTfWffDiGE_H-_N"]}"#;
-        let block: Block<ControllingIdentifier> = serde_json::from_str(sed_last).unwrap();
+        let block: Block<IdentifierPrefix> = serde_json::from_str(sed_last).unwrap();
         assert_eq!(last, block);
 
         assert_ne!(last, at_micro.get_last_block().unwrap().to_owned());
