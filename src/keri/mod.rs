@@ -9,6 +9,8 @@ use crate::{
 };
 
 pub mod signed_block;
+#[cfg(test)]
+mod tests;
 pub mod verifier;
 
 pub type KeriSignature = keri::event_message::signature::Signature;

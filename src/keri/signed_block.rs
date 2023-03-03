@@ -42,3 +42,71 @@ impl From<ParsedData> for SignedBlock<IdentifierPrefix, KeriSignature> {
         block.to_signed_block(signatures)
     }
 }
+
+#[cfg(test)]
+mod test {
+    use std::sync::Arc;
+
+    use cesrox::primitives::codes::self_signing::SelfSigning;
+    use ed25519_dalek::ExpandedSecretKey;
+    use keri::{
+        database::SledEventDatabase,
+        event_message::signature::Nontransferable,
+        keys::PublicKey,
+        prefix::{BasicPrefix, IdentifierPrefix, SelfSigningPrefix},
+        processor::basic_processor::BasicProcessor,
+    };
+    use rand::rngs::OsRng;
+    use sai::derivation::SelfAddressing;
+    use tempfile::Builder;
+
+    use crate::{
+        block::{Block, SignedBlock},
+        digital_fingerprint::DigitalFingerprint,
+        keri::KeriSignature,
+        seals::Seal,
+        Encode,
+    };
+
+    #[test]
+    fn test_signed_block() {
+        use crate::keri::verifier::KeriVerifier;
+        let root = Builder::new().prefix("test-db").tempdir().unwrap();
+        let db = Arc::new(SledEventDatabase::new(root.path()).unwrap());
+        let _event_processor = BasicProcessor::new(Arc::clone(&db), None);
+        let validator = Arc::new(KeriVerifier::new(db));
+
+        // generate keypair
+        let kp = ed25519_dalek::Keypair::generate(&mut OsRng {});
+        let (pk, sk) = (kp.public, kp.secret);
+        let pref = BasicPrefix::Ed25519(PublicKey::new(pk.as_bytes().to_vec()));
+        let bp = keri::prefix::IdentifierPrefix::Basic(pref.clone());
+
+        let sign = |data| {
+            ExpandedSecretKey::from(&sk)
+                .sign(data, &pk)
+                .as_ref()
+                .to_vec()
+        };
+        let seal = SelfAddressing::Blake3_256.derive("exmaple".as_bytes());
+        let prev = Some(DigitalFingerprint::SelfAddressing(
+            SelfAddressing::Blake3_256.derive("exmaple".as_bytes()),
+        ));
+        let block = Block::new(vec![Seal::Attached(seal)], prev, vec![(bp)]);
+
+        let sig = KeriSignature::NonTransferable(Nontransferable::Couplet(vec![(
+            pref,
+            SelfSigningPrefix::new(SelfSigning::Ed25519Sha512, sign(&block.encode())),
+        )]));
+
+        let signed = block.to_signed_block(vec![sig]);
+        assert!(signed.verify(validator, None).unwrap());
+
+        let signed_block_cesr = signed.to_cesr().unwrap();
+
+        let block_from_cesr =
+            SignedBlock::<IdentifierPrefix, KeriSignature>::from_cesr(&signed_block_cesr).unwrap();
+        assert_eq!(block_from_cesr.block, signed.block);
+        assert_eq!(block_from_cesr.signatures, signed.signatures);
+    }
+}
