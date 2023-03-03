@@ -17,6 +17,3 @@ pub trait Encode {
 /// Controlling identifiers can be anything that is considered identifiable within given network,
 /// ie. `Public Key`, `DID`, `KERI` prefix and so on.
 pub trait Identifier {}
-
-#[cfg(test)]
-mod tests;

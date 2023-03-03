@@ -3,7 +3,7 @@ pub(crate) mod helpers {
     use ed25519_dalek::{PublicKey, Signature as EdLibSignature, Verifier as EdLibVerifier};
     use serde::{Deserialize, Serialize};
 
-    use crate::{verifier::Verifier, Identifier};
+    use microledger::{verifier::Verifier, Identifier};
 
     #[derive(Serialize, Deserialize, Clone)]
     pub struct EasyIdentifier(pub String);
@@ -17,7 +17,11 @@ pub(crate) mod helpers {
     impl Verifier for EdVerifier {
         type Signature = EdSignature;
 
-        fn verify(&self, data: &[u8], s: Vec<Self::Signature>) -> crate::microledger::Result<bool> {
+        fn verify(
+            &self,
+            data: &[u8],
+            s: Vec<Self::Signature>,
+        ) -> microledger::microledger::Result<bool> {
             Ok(s.iter().all(|sig| {
                 let raw_sig = general_purpose::STANDARD_NO_PAD.decode(&sig.0).unwrap();
                 self.0
@@ -36,15 +40,16 @@ pub mod test {
     use rand::rngs::OsRng;
     use sai::derivation::SelfAddressing;
 
-    use crate::{
+    use microledger::{
         block::Block,
         digital_fingerprint::DigitalFingerprint,
         microledger::MicroLedger,
         seal_bundle::{SealBundle, SealData},
         seals::Seal,
-        tests::helpers::{EasyIdentifier, EdSignature, EdVerifier},
         Encode,
     };
+
+    use crate::helpers::{EasyIdentifier, EdSignature, EdVerifier};
 
     #[test]
     fn test_block_serialization() {
