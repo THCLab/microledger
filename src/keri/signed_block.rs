@@ -1,8 +1,8 @@
-use cesrox::{payload::Payload, ParsedData, parse};
+use cesrox::{parse, payload::Payload, ParsedData};
 
 use crate::block::Block;
-use crate::{block::SignedBlock, Encode};
 use crate::microledger::Result;
+use crate::{block::SignedBlock, Encode};
 
 use super::controlling_identifier::ControllingIdentifier;
 use super::signature::{KeriSignature, KeriSignatures, ToCesr};

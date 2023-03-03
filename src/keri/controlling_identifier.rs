@@ -10,10 +10,6 @@ use crate::Identifier;
 
 impl Identifier for ControllingIdentifier {}
 
-/// Controlling identifier describes control authority over the Microledger in a given block.
-/// Control _MAY_ be established for single or multiple identifiers through the multisig feature.
-/// Controlling identifiers can be anything that is considered identifiable within given network,
-/// ie. `Public Key`, `DID`, `KERI` prefix and so on.
 #[derive(Clone, Debug, PartialEq)]
 pub enum ControllingIdentifier {
     // Basic(BasicPrefix),

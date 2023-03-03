@@ -1,12 +1,12 @@
-use std::{fmt::Display, str::FromStr};
+use std::fmt::Display;
 
 use cesrox::{
     group::Group,
-    primitives::{CesrPrimitive, IdentifierCode, IndexedSignature},
+    primitives::{IdentifierCode, IndexedSignature},
 };
 use keri::prefix::{BasicPrefix, IdentifierPrefix, SelfSigningPrefix};
 use sai::SelfAddressingPrefix;
-use serde::{Deserialize, Deserializer, Serialize, Serializer};
+use serde::{Serialize, Serializer};
 
 use crate::error::Error;
 pub trait ToCesr {

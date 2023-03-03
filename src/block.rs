@@ -2,14 +2,11 @@ use std::{fmt::Debug, sync::Arc};
 
 use serde::{Deserialize, Serialize};
 
-use crate::{
-    digital_fingerprint::DigitalFingerprint,
-    error::Error,
-    seals::Seal,
-    verifier::Verifier,
-    Encode, Identifier,
-};
 use crate::microledger::Result;
+use crate::{
+    digital_fingerprint::DigitalFingerprint, error::Error, seals::Seal, verifier::Verifier, Encode,
+    Identifier,
+};
 
 #[derive(Clone, Serialize, Deserialize, PartialEq, Debug)]
 pub struct Block<I: Identifier + Serialize> {
@@ -77,7 +74,7 @@ impl<S: Clone, I: Identifier + Serialize> SignedBlock<I, S> {
     pub fn verify<V: Verifier<Signature = S>>(
         &self,
         verifier: Arc<V>,
-        controlling_identifiers: Option<Vec<I>>,
+        _controlling_identifiers: Option<Vec<I>>,
     ) -> Result<bool> {
         // TODO
         // Check controlling identifiers
@@ -85,10 +82,9 @@ impl<S: Clone, I: Identifier + Serialize> SignedBlock<I, S> {
     }
 
     pub fn check_block(&self, block: Option<&Block<I>>) -> Result<bool> {
-        Ok(self.block.check_previous(block)?) // && self.check_seals()?)
+        self.block.check_previous(block) // && self.check_seals()?)
     }
 }
-
 
 #[cfg(test)]
 #[cfg(feature = "keri")]
@@ -97,10 +93,7 @@ pub mod test {
     use serde::{Deserialize, Serialize};
 
     use crate::{
-        block::{Block},
-        digital_fingerprint::DigitalFingerprint,
-        seals::Seal,
-        Encode, Identifier,
+        block::Block, digital_fingerprint::DigitalFingerprint, seals::Seal, Encode, Identifier,
     };
     #[derive(Serialize, Deserialize)]
     struct EasyIdentifier(String);
@@ -119,7 +112,8 @@ pub mod test {
         let block = Block::new(vec![Seal::Attached(seal)], prev, vec![(id)]);
         println!("{}", String::from_utf8(block.encode()).unwrap());
 
-        let deserialized_block: Block<EasyIdentifier> = serde_json::from_slice(&block.encode()).unwrap();
+        let deserialized_block: Block<EasyIdentifier> =
+            serde_json::from_slice(&block.encode()).unwrap();
         assert_eq!(block.encode(), deserialized_block.encode());
     }
 }

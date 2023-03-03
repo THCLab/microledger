@@ -5,11 +5,11 @@ use serde::{Deserialize, Serialize};
 use crate::error::Error;
 use crate::seal_bundle::SealBundle;
 use crate::verifier::Verifier;
-use crate::{Encode, Identifier};
 use crate::{
     block::{Block, SignedBlock},
     digital_fingerprint::DigitalFingerprint,
 };
+use crate::{Encode, Identifier};
 
 pub type Result<T> = std::result::Result<T, Error>;
 
@@ -21,7 +21,9 @@ pub struct MicroLedger<S: Serialize, V: Verifier<Signature = S>, I: Identifier +
     pub verifier: Arc<V>,
 }
 
-impl<S: Serialize + Clone, V: Verifier<Signature = S>, I: Identifier + Serialize + Clone> MicroLedger<S, V, I> {
+impl<S: Serialize + Clone, V: Verifier<Signature = S>, I: Identifier + Serialize + Clone>
+    MicroLedger<S, V, I>
+{
     pub fn new(verifier: Arc<V>) -> Self {
         MicroLedger {
             blocks: vec![],
@@ -101,7 +103,7 @@ impl<S: Serialize + Clone, V: Verifier<Signature = S>, I: Identifier + Serialize
             .ok_or_else(|| Error::MicroError("No block of given fingerprint".into()))
     }
 
-    fn get_block_by_fingerprint(
+    pub fn get_block_by_fingerprint(
         &self,
         fingerprint: &DigitalFingerprint,
     ) -> Result<&SignedBlock<I, S>> {

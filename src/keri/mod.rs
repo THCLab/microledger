@@ -1,14 +1,16 @@
 use std::sync::Arc;
 
-use crate::{verifier::Verifier, microledger::{MicroLedger, Result}};
+use crate::{
+    microledger::{MicroLedger, Result},
+    verifier::Verifier,
+};
 
-use self::{signature::KeriSignature, controlling_identifier::ControllingIdentifier};
+use self::{controlling_identifier::ControllingIdentifier, signature::KeriSignature};
 
-
-pub mod verifier;
-pub mod signed_block;
-pub mod signature;
 pub mod controlling_identifier;
+pub mod signature;
+pub mod signed_block;
+pub mod verifier;
 
 #[cfg(feature = "keri")]
 impl<V: Verifier<Signature = KeriSignature>> MicroLedger<KeriSignature, V, ControllingIdentifier> {

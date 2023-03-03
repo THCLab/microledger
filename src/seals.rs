@@ -58,6 +58,6 @@ impl<'de> Deserialize<'de> for Seal {
 #[test]
 pub fn test_parse_seal() {
     let seal_str = "AEPq_TXbqQFKrIZn9Sw8CGDMVqcDF4eipFgHr__lhcics";
-    let seal: Result<Seal, _> = Seal::from_str(&seal_str);
+    let seal: Result<Seal, _> = Seal::from_str(seal_str);
     assert!(seal.is_ok());
 }
