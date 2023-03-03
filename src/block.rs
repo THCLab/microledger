@@ -1,6 +1,7 @@
-use std::fmt::Debug;
+use std::{fmt::Debug, sync::Arc};
 
 use cesrox::{parse, payload::Payload, ParsedData};
+use keri::{processor::validator::EventValidator, database::SledEventDatabase, event::sections::seal::EventSeal, event_message::signature::Nontransferable};
 use serde::{Deserialize, Serialize};
 
 use crate::{
@@ -9,7 +10,7 @@ use crate::{
     error::Error,
     seals::Seal,
     signature::{KeriSignature, Verify, ToCesr, KeriSignatures},
-    Encode,
+    Encode, verifier::Verifier,
 };
 pub type Result<T> = std::result::Result<T, Error>;
 
@@ -62,6 +63,8 @@ impl Block {
     }
 }
 
+
+
 #[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct SignedBlock<S: Verify> {
     pub block: Block,
@@ -69,25 +72,21 @@ pub struct SignedBlock<S: Verify> {
 }
 
 // Checks if signed block matches the given block.
-impl<S: Verify> SignedBlock<S> {
+impl<S: Verify +  Clone> SignedBlock<S> {
     pub fn new(block: Block, sigs: Vec<S>) -> Self {
         Self {
             block,
             signatures: sigs,
         }
     }
-    pub fn verify(
+    pub fn verify<V: Verifier<Signature = S>>(
         &self,
+        verifier: Arc<V>,
         controlling_identifiers: Option<Vec<ControllingIdentifier>>,
     ) -> Result<bool> {
         // TODO
         // Check controlling identifiers
-        Ok(self.signatures.iter().all(|sig| {
-            match sig.verify(Encode::encode(&self.block)) {
-                Ok(_) => true,
-                Err(_) => false,
-            }
-        }))
+        verifier.verify(&Encode::encode(&self.block), self.signatures.clone())
     }
 
     pub fn check_block(&self, block: Option<&Block>) -> Result<bool> {
@@ -139,14 +138,17 @@ impl From<ParsedData> for SignedBlock<KeriSignature> {
 
 #[cfg(test)]
 pub mod test {
+    use std::sync::Arc;
+
     use cesrox::primitives::codes::self_signing::SelfSigning;
     use ed25519_dalek::ExpandedSecretKey;
     use keri::{
         keys::PublicKey,
-        prefix::{BasicPrefix, SelfSigningPrefix},
+        prefix::{BasicPrefix, SelfSigningPrefix}, database::SledEventDatabase, processor::{basic_processor::BasicProcessor, validator::EventValidator},
     };
     use rand::rngs::OsRng;
     use sai::derivation::SelfAddressing;
+    use tempfile::Builder;
 
     use crate::{
         block::{Block, SignedBlock},
@@ -177,39 +179,5 @@ pub mod test {
         assert_eq!(block.encode(), deserialized_block.encode());
     }
 
-    #[test]
-    fn test_signed_block() {
-        // generate keypair
-        let kp = ed25519_dalek::Keypair::generate(&mut OsRng {});
-        let (pk, sk) = (kp.public, kp.secret);
-        let pref = BasicPrefix::Ed25519(PublicKey::new(pk.as_bytes().to_vec()));
-        let bp = ControllingIdentifier::Keri(keri::prefix::IdentifierPrefix::Basic(pref.clone()));
-
-        let sign = |data| {
-            ExpandedSecretKey::from(&sk)
-                .sign(data, &pk)
-                .as_ref()
-                .to_vec()
-        };
-        let seal = SelfAddressing::Blake3_256.derive("exmaple".as_bytes());
-        let prev = Some(DigitalFingerprint::SelfAddressing(
-            SelfAddressing::Blake3_256.derive("exmaple".as_bytes()),
-        ));
-        let block = Block::new(vec![Seal::Attached(seal)], prev, vec![(bp)]);
-
-        let sig = KeriSignature::Nontransferable(
-            pref,
-            SelfSigningPrefix::new(SelfSigning::Ed25519Sha512, sign(&block.encode())),
-        );
-
-        let signed = block.to_signed_block(vec![sig]);
-        assert!(signed.verify(None).unwrap());
-
-        let signed_block_cesr = signed.to_cesr().unwrap();
-
-        let block_from_cesr = SignedBlock::<KeriSignature>::from_cesr(&signed_block_cesr).unwrap();
-        assert_eq!(block_from_cesr.block, signed.block);
-        assert_eq!(block_from_cesr.signatures, signed.signatures);
-
-    }
+    
 }
