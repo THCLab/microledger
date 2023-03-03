@@ -19,4 +19,4 @@ pub trait Encode {
 pub trait Identifier {}
 
 #[cfg(test)]
-mod tests {}
+mod tests;

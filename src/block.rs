@@ -85,35 +85,3 @@ impl<S: Clone, I: Identifier + Serialize> SignedBlock<I, S> {
         self.block.check_previous(block) // && self.check_seals()?)
     }
 }
-
-#[cfg(test)]
-#[cfg(feature = "keri")]
-pub mod test {
-    use sai::derivation::SelfAddressing;
-    use serde::{Deserialize, Serialize};
-
-    use crate::{
-        block::Block, digital_fingerprint::DigitalFingerprint, seals::Seal, Encode, Identifier,
-    };
-    #[derive(Serialize, Deserialize)]
-    struct EasyIdentifier(String);
-
-    impl Identifier for EasyIdentifier {}
-
-    #[test]
-    fn test_block_serialization() {
-        // generate keypair
-        let id = EasyIdentifier("Identifier1".to_string());
-
-        let seal = SelfAddressing::Blake3_256.derive("exmaple".as_bytes());
-        let prev = Some(DigitalFingerprint::SelfAddressing(
-            SelfAddressing::Blake3_256.derive("exmaple".as_bytes()),
-        ));
-        let block = Block::new(vec![Seal::Attached(seal)], prev, vec![(id)]);
-        println!("{}", String::from_utf8(block.encode()).unwrap());
-
-        let deserialized_block: Block<EasyIdentifier> =
-            serde_json::from_slice(&block.encode()).unwrap();
-        assert_eq!(block.encode(), deserialized_block.encode());
-    }
-}

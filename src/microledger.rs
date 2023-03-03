@@ -14,15 +14,23 @@ use crate::{Encode, Identifier};
 pub type Result<T> = std::result::Result<T, Error>;
 
 #[derive(Default, Serialize, Deserialize, Debug)]
-pub struct MicroLedger<S: Serialize, V: Verifier<Signature = S>, I: Identifier + Serialize> {
+pub struct MicroLedger<S, V, I>
+where
+    S: Serialize,
+    V: Verifier<Signature = S>,
+    I: Identifier + Serialize,
+{
     #[serde(rename = "bs")]
     pub blocks: Vec<SignedBlock<I, S>>,
     #[serde(skip)]
     pub verifier: Arc<V>,
 }
 
-impl<S: Serialize + Clone, V: Verifier<Signature = S>, I: Identifier + Serialize + Clone>
-    MicroLedger<S, V, I>
+impl<S, V, I> MicroLedger<S, V, I>
+where
+    S: Serialize + Clone,
+    V: Verifier<Signature = S>,
+    I: Identifier + Serialize + Clone,
 {
     pub fn new(verifier: Arc<V>) -> Self {
         MicroLedger {

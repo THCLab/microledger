@@ -12,7 +12,6 @@ impl Identifier for ControllingIdentifier {}
 
 #[derive(Clone, Debug, PartialEq)]
 pub enum ControllingIdentifier {
-    // Basic(BasicPrefix),
     Keri(IdentifierPrefix),
 }
 

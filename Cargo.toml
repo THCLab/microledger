@@ -22,4 +22,5 @@ keri = {git = "https://github.com/THCLab/keriox", branch = "partial_rot", option
 ed25519-dalek = "1.0.1"
 rand = { version = "0.7.3", features = ["std", "getrandom"]}
 tempfile = { version = "3.1" }
+base64 = "0.21.0"
 
