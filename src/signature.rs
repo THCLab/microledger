@@ -2,33 +2,28 @@ use std::{fmt::Display, str::FromStr};
 
 use cesrox::{
     group::Group,
-    primitives::{CesrPrimitive, IndexedSignature, IdentifierCode},
+    primitives::{CesrPrimitive, IdentifierCode, IndexedSignature},
 };
 use keri::prefix::{BasicPrefix, IdentifierPrefix, SelfSigningPrefix};
 use sai::SelfAddressingPrefix;
 use serde::{Deserialize, Deserializer, Serialize, Serializer};
 
 use crate::error::Error;
-
-pub trait Verify {
-    fn verify(&self, data: Vec<u8>) -> Result<(), Error>;
-}
-
 pub trait ToCesr {
     fn to_cesr_attachment(&self) -> Result<Group, Error>;
 }
 
-impl Verify for KeriSignature {
-    fn verify(&self, data: Vec<u8>) -> Result<(), Error> {
-        match self {
-            KeriSignature::Transferable(_, _, _, _) => todo!(),
-            KeriSignature::Nontransferable(bp, ssp) => (bp.verify(&data, ssp))
-                .unwrap()
-                .then(|| ())
-                .ok_or(Error::SignatureVerificationError),
-        }
-    }
-}
+// impl Verify for KeriSignature {
+//     fn verify(&self, data: Vec<u8>) -> Result<(), Error> {
+//         match self {
+//             KeriSignature::Transferable(_, _, _, _) => todo!(),
+//             KeriSignature::Nontransferable(bp, ssp) => (bp.verify(&data, ssp))
+//                 .unwrap()
+//                 .then(|| ())
+//                 .ok_or(Error::SignatureVerificationError),
+//         }
+//     }
+// }
 
 impl ToCesr for KeriSignature {
     fn to_cesr_attachment(&self) -> Result<Group, Error> {
@@ -52,43 +47,40 @@ pub struct KeriSignatures(pub Vec<KeriSignature>);
 
 impl From<Group> for KeriSignatures {
     fn from(value: Group) -> Self {
-       let group = match value {
-                Group::NontransReceiptCouples(nontrans_sigs) => nontrans_sigs
-                    .into_iter()
-                    .filter_map(|((pk_code, pk), (sp_code, ssp))| {
-                        Some(KeriSignature::Nontransferable(
-                            BasicPrefix::new(
-                                (pk_code).into(),
-                                keri::keys::PublicKey::new(pk.to_vec()),
-                            ),
-                            SelfSigningPrefix::new((sp_code).into(), ssp.to_vec()),
-                        ))
-                    })
-                    .collect::<Vec<_>>(),
-                Group::TransIndexedSigGroups(trans_sigs) => trans_sigs
-                    .into_iter()
-                    .filter_map(|((id_code, id), sn, (dig_code, dig), sigs)| {
-                        let id = match id_code {
-                            IdentifierCode::Basic(bp) => IdentifierPrefix::Basic(BasicPrefix::new(
-                                bp,
-                                keri::keys::PublicKey::new(id),
-                            )),
-                            IdentifierCode::SelfAddressing(sa) => IdentifierPrefix::SelfAddressing(
-                                SelfAddressingPrefix::new(sa.into(), id),
-                            ),
-                        };
-                        Some(KeriSignature::Transferable(
-                            id,
-                            sn,
-                            SelfAddressingPrefix::new(dig_code.into(), dig),
-                            sigs,
-                        ))
-                    })
-                    .collect::<Vec<_>>(),
-                _ => todo!(),
-    };
-    KeriSignatures(group)
-}
+        let group = match value {
+            Group::NontransReceiptCouples(nontrans_sigs) => nontrans_sigs
+                .into_iter()
+                .filter_map(|((pk_code, pk), (sp_code, ssp))| {
+                    Some(KeriSignature::Nontransferable(
+                        BasicPrefix::new((pk_code).into(), keri::keys::PublicKey::new(pk.to_vec())),
+                        SelfSigningPrefix::new((sp_code).into(), ssp.to_vec()),
+                    ))
+                })
+                .collect::<Vec<_>>(),
+            Group::TransIndexedSigGroups(trans_sigs) => trans_sigs
+                .into_iter()
+                .filter_map(|((id_code, id), sn, (dig_code, dig), sigs)| {
+                    let id = match id_code {
+                        IdentifierCode::Basic(bp) => IdentifierPrefix::Basic(BasicPrefix::new(
+                            bp,
+                            keri::keys::PublicKey::new(id),
+                        )),
+                        IdentifierCode::SelfAddressing(sa) => IdentifierPrefix::SelfAddressing(
+                            SelfAddressingPrefix::new(sa.into(), id),
+                        ),
+                    };
+                    Some(KeriSignature::Transferable(
+                        id,
+                        sn,
+                        SelfAddressingPrefix::new(dig_code.into(), dig),
+                        sigs,
+                    ))
+                })
+                .collect::<Vec<_>>(),
+            _ => todo!(),
+        };
+        KeriSignatures(group)
+    }
 }
 
 /// Signatures include the cryptographic commitment of Custodians to a given Block.

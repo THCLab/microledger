@@ -1,7 +1,6 @@
 use std::{fmt::Debug, sync::Arc};
 
 use cesrox::{parse, payload::Payload, ParsedData};
-use keri::{processor::validator::EventValidator, database::SledEventDatabase, event::sections::seal::EventSeal, event_message::signature::Nontransferable};
 use serde::{Deserialize, Serialize};
 
 use crate::{
@@ -9,8 +8,9 @@ use crate::{
     digital_fingerprint::DigitalFingerprint,
     error::Error,
     seals::Seal,
-    signature::{KeriSignature, Verify, ToCesr, KeriSignatures},
-    Encode, verifier::Verifier,
+    signature::{KeriSignature, KeriSignatures, ToCesr},
+    verifier::Verifier,
+    Encode,
 };
 pub type Result<T> = std::result::Result<T, Error>;
 
@@ -43,7 +43,7 @@ impl Block {
         }
     }
 
-    pub fn to_signed_block<S: Verify>(self, signatures: Vec<S>) -> SignedBlock<S> {
+    pub fn to_signed_block<S>(self, signatures: Vec<S>) -> SignedBlock<S> {
         SignedBlock {
             block: self,
             signatures,
@@ -63,16 +63,14 @@ impl Block {
     }
 }
 
-
-
 #[derive(Debug, Serialize, Deserialize, Clone)]
-pub struct SignedBlock<S: Verify> {
+pub struct SignedBlock<S> {
     pub block: Block,
     pub signatures: Vec<S>,
 }
 
 // Checks if signed block matches the given block.
-impl<S: Verify +  Clone> SignedBlock<S> {
+impl<S: Clone> SignedBlock<S> {
     pub fn new(block: Block, sigs: Vec<S>) -> Self {
         Self {
             block,
@@ -92,7 +90,6 @@ impl<S: Verify +  Clone> SignedBlock<S> {
     pub fn check_block(&self, block: Option<&Block>) -> Result<bool> {
         Ok(self.block.check_previous(block)?) // && self.check_seals()?)
     }
-
 }
 impl SignedBlock<KeriSignature> {
     pub fn to_cesr(&self) -> Result<Vec<u8>> {
@@ -143,8 +140,10 @@ pub mod test {
     use cesrox::primitives::codes::self_signing::SelfSigning;
     use ed25519_dalek::ExpandedSecretKey;
     use keri::{
+        database::SledEventDatabase,
         keys::PublicKey,
-        prefix::{BasicPrefix, SelfSigningPrefix}, database::SledEventDatabase, processor::{basic_processor::BasicProcessor, validator::EventValidator},
+        prefix::{BasicPrefix, SelfSigningPrefix},
+        processor::{basic_processor::BasicProcessor, validator::EventValidator},
     };
     use rand::rngs::OsRng;
     use sai::derivation::SelfAddressing;
@@ -178,6 +177,4 @@ pub mod test {
         let deserialized_block: Block = serde_json::from_slice(&block.encode()).unwrap();
         assert_eq!(block.encode(), deserialized_block.encode());
     }
-
-    
 }

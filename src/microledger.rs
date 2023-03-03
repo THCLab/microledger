@@ -2,11 +2,11 @@ use std::sync::Arc;
 
 use serde::{Deserialize, Serialize};
 
-use crate::Encode;
 use crate::error::Error;
 use crate::seal_bundle::SealBundle;
-use crate::signature::{Verify, KeriSignature};
+use crate::signature::KeriSignature;
 use crate::verifier::Verifier;
+use crate::Encode;
 use crate::{
     block::{Block, SignedBlock},
     controlling_identifier::ControllingIdentifier,
@@ -16,16 +16,19 @@ use crate::{
 pub type Result<T> = std::result::Result<T, Error>;
 
 #[derive(Default, Serialize, Deserialize, Debug)]
-pub struct MicroLedger<S: Verify + Serialize, V: Verifier<Signature = S>> {
+pub struct MicroLedger<S: Serialize, V: Verifier<Signature = S>> {
     #[serde(rename = "bs")]
     pub blocks: Vec<SignedBlock<S>>,
     #[serde(skip)]
     pub verifier: Arc<V>,
 }
 
-impl<S: Verify + Serialize +  Clone, V: Verifier<Signature = S>> MicroLedger<S, V> {
+impl<S: Serialize + Clone, V: Verifier<Signature = S>> MicroLedger<S, V> {
     pub fn new(verifier: Arc<V>) -> Self {
-        MicroLedger { blocks: vec![], verifier }
+        MicroLedger {
+            blocks: vec![],
+            verifier,
+        }
     }
 
     pub fn append_block(&mut self, signed_block: SignedBlock<S>) -> Result<()> {
@@ -50,7 +53,12 @@ impl<S: Verify + Serialize +  Clone, V: Verifier<Signature = S>> MicroLedger<S, 
     pub fn anchor(&mut self, block: SignedBlock<S>) -> Result<()> {
         let last = self.get_last_block();
         // Checks block binding and signatures.
-        if block.check_block(last)? && block.verify(self.verifier.clone(), self.current_controlling_identifiers()?)? {
+        if block.check_block(last)?
+            && block.verify(
+                self.verifier.clone(),
+                self.current_controlling_identifiers()?,
+            )?
+        {
             self.append_block(block)
         } else {
             Err(Error::MicroError("Wrong block".into()))
@@ -74,7 +82,10 @@ impl<S: Verify + Serialize +  Clone, V: Verifier<Signature = S>> MicroLedger<S, 
             .into_iter()
             .take(position.unwrap() + 1)
             .collect();
-        Some(Self { blocks, verifier: self.verifier.clone() })
+        Some(Self {
+            blocks,
+            verifier: self.verifier.clone(),
+        })
     }
 
     fn current_controlling_identifiers(&self) -> Result<Option<Vec<ControllingIdentifier>>> {
@@ -92,7 +103,10 @@ impl<S: Verify + Serialize +  Clone, V: Verifier<Signature = S>> MicroLedger<S, 
             .ok_or_else(|| Error::MicroError("No block of given fingerprint".into()))
     }
 
-    fn get_block_by_fingerprint(&self, fingerprint: &DigitalFingerprint) -> Result<&SignedBlock<S>> {
+    fn get_block_by_fingerprint(
+        &self,
+        fingerprint: &DigitalFingerprint,
+    ) -> Result<&SignedBlock<S>> {
         self.blocks
             .iter()
             .find(|b| fingerprint.verify_binding(&Encode::encode(&b.block)))
@@ -114,21 +128,23 @@ impl<S: Verify + Serialize +  Clone, V: Verifier<Signature = S>> MicroLedger<S, 
     //         .collect();
     //     found_data
     // }
-} 
+}
 impl<V: Verifier<Signature = KeriSignature>> MicroLedger<KeriSignature, V> {
     pub fn new_from_cesr(stream: &[u8], verifier: Arc<V>) -> Result<Self> {
         let (_rest, parsed_stream) = cesrox::parse_many(stream).unwrap();
         let mut microledger = MicroLedger::new(verifier);
-        parsed_stream.into_iter().for_each(|pd| microledger.append_block(pd.into()).unwrap());
+        parsed_stream
+            .into_iter()
+            .for_each(|pd| microledger.append_block(pd.into()).unwrap());
         Ok(microledger)
     }
 
     pub fn to_cesr(&self) -> Result<Vec<u8>> {
-        Ok(self.blocks
+        Ok(self
+            .blocks
             .iter()
             .map(|bl| bl.to_cesr().unwrap())
             .flatten()
             .collect())
     }
 }
-

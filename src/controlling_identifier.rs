@@ -6,7 +6,6 @@ use cesrox::primitives::{
 use keri::prefix::{BasicPrefix, IdentifierPrefix};
 use serde::{Deserialize, Deserializer, Serialize, Serializer};
 
-
 /// Controlling identifier describes control authority over the Microledger in a given block.
 /// Control _MAY_ be established for single or multiple identifiers through the multisig feature.
 /// Controlling identifiers can be anything that is considered identifiable within given network,
