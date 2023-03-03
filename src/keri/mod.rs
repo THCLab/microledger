@@ -34,8 +34,7 @@ where
         Ok(self
             .blocks
             .iter()
-            .map(|bl| bl.to_cesr().unwrap())
-            .flatten()
+            .flat_map(|bl| bl.to_cesr().unwrap())
             .collect())
     }
 }

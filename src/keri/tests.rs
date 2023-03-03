@@ -102,7 +102,7 @@ fn test_microledger() {
 fn test_microledger_traversing() {
     let root = Builder::new().prefix("test-db").tempdir().unwrap();
     let db = Arc::new(SledEventDatabase::new(root.path()).unwrap());
-    let event_processor = BasicProcessor::new(Arc::clone(&db), None);
+    let _event_processor = BasicProcessor::new(Arc::clone(&db), None);
     let validator = Arc::new(KeriVerifier::new(db));
 
     let serialized_microledger = r#"{"s":["AEOqPFj2zhoKSXkSRxeWNS7NQbvjBTreKhukIxWJKZyAP"],"ci":["DDSJCC9yQkd62kcQk-iW9xA20mgrCrTfWffDiGE_H-_N"]}-CABDDSJCC9yQkd62kcQk-iW9xA20mgrCrTfWffDiGE_H-_N0BA3mV0Ga-e3Ly2yAy2w9PgUbrgglzuDFBh8TQXal1zQlsOYFxWf3x6uqpiVpuiKMddnmMEWGF0iTFgrw07UGSYO{"s":["AEOqPFj2zhoKSXkSRxeWNS7NQbvjBTreKhukIxWJKZyAP"],"p":"AEL_OPgFBnvQ45jaVqygWfEDbdkaPaC_x81yhh8nOmerL","ci":["DDSJCC9yQkd62kcQk-iW9xA20mgrCrTfWffDiGE_H-_N"]}-CABDDSJCC9yQkd62kcQk-iW9xA20mgrCrTfWffDiGE_H-_N0BDQb_cVMsBGFgtxj5JakS1icx3ubheCOvth4U-c9hRsL38msumM7xJHmaTXpCNcNTDRtNw8tS6O5Ki9EuAKxecD{"s":["AEOqPFj2zhoKSXkSRxeWNS7NQbvjBTreKhukIxWJKZyAP"],"p":"AEP-tb9xGrwyHlm_ekDIQIAsvj2lp_el0p2zfUcXEM30I","ci":["DDSJCC9yQkd62kcQk-iW9xA20mgrCrTfWffDiGE_H-_N"]}-CABDDSJCC9yQkd62kcQk-iW9xA20mgrCrTfWffDiGE_H-_N0BDYbWMxzpoec8aYKe0kdE9bUoBizBQZ1R8kZiFbyA9P2iXH5LBaMj9vrbZSxlWQspPfDIDlsitrEYkxuYjc4oQG"#;

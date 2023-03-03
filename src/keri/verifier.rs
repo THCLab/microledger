@@ -13,7 +13,7 @@ impl Verifier for KeriVerifier {
 
     fn verify(&self, data: &[u8], s: Vec<Self::Signature>) -> Result<bool> {
         Ok(s.into_iter()
-            .all(|sig| self.0.verify(data, &sig.into()).is_ok()))
+            .all(|sig| self.0.verify(data, &sig).is_ok()))
     }
 }
 

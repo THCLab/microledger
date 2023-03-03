@@ -67,7 +67,7 @@ pub mod test {
     fn test_microledger() {
         // generate keypair and setup verifier
         let kp = ed25519_dalek::Keypair::generate(&mut OsRng {});
-        let pk = kp.public.clone();
+        let pk = kp.public;
         let validator = Arc::new(EdVerifier(pk));
 
         let identifier = EasyIdentifier("Identifier1".to_string());
@@ -76,7 +76,7 @@ pub mod test {
         let seals = SealBundle::new().attach(SealData::AttachedData("hello".into()));
         let block = microledger.pre_anchor_block(vec![(identifier.clone())], &seals);
 
-        let sign = |data: Vec<u8>| (&kp).sign(&data).as_ref().to_vec();
+        let sign = |data: Vec<u8>| kp.sign(&data).as_ref().to_vec();
 
         let b64_signature =
             general_purpose::STANDARD_NO_PAD.encode(sign(b"Wrong signature".to_vec()));

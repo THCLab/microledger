@@ -36,8 +36,7 @@ impl From<ParsedData> for SignedBlock<IdentifierPrefix, KeriSignature> {
         let signatures: Vec<_> = parsed
             .attachments
             .into_iter()
-            .map(|g| get_signatures(g).unwrap())
-            .flatten()
+            .flat_map(|g| get_signatures(g).unwrap())
             .collect();
         block.to_signed_block(signatures)
     }
