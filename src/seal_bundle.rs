@@ -46,28 +46,28 @@ impl SealBundle {
                 hm.insert(s.fingerprint().fingerprint(), data.to_string());
             }
         });
-        BlockAttachment { attachements: hm }
+        BlockAttachment { attachments: hm }
     }
 }
 
 #[derive(Clone, Serialize, Deserialize, Debug, Default)]
 pub struct BlockAttachment {
-    attachements: HashMap<String, String>,
+    attachments: HashMap<String, String>,
 }
 
 impl BlockAttachment {
     pub fn new() -> Self {
         Self {
-            attachements: HashMap::new(),
+            attachments: HashMap::new(),
         }
     }
 
     pub fn get(&self, digest: &str) -> Option<String> {
-        self.attachements.get(digest).map(|s| s.to_string())
+        self.attachments.get(digest).map(|s| s.to_string())
     }
 
     pub fn to_seal_bundle(&self) -> SealBundle {
-        self.attachements.iter().fold(SealBundle::new(), |acc, v| {
+        self.attachments.iter().fold(SealBundle::new(), |acc, v| {
             acc.attach(SealData::AttachedData(v.1.clone()))
         })
     }

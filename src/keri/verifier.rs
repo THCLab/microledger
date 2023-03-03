@@ -5,7 +5,9 @@ use keri::{
     event_message::signature::Nontransferable, processor::validator::EventValidator,
 };
 
-use crate::{microledger::Result, signature::KeriSignature, verifier::Verifier};
+use crate::{microledger::Result, verifier::Verifier};
+
+use super::signature::KeriSignature;
 
 pub struct KeriVerifier(EventValidator);
 
@@ -43,6 +45,7 @@ impl KeriVerifier {
     }
 }
 
+
 #[cfg(test)]
 pub mod test {
 
@@ -62,20 +65,17 @@ pub mod test {
 
     use crate::{
         block::{Block, SignedBlock},
-        controlling_identifier::ControllingIdentifier,
         digital_fingerprint::DigitalFingerprint,
-        keri::KeriVerifier,
         microledger::MicroLedger,
         seal_bundle::{SealBundle, SealData},
         seals::Seal,
-        signature::KeriSignature,
-        Encode,
+        Encode, keri::{verifier::KeriVerifier, signature::KeriSignature, controlling_identifier::ControllingIdentifier},
     };
 
     #[test]
     fn test_signed_block() {
         #[cfg(feature = "keri")]
-        use crate::keri::KeriVerifier;
+        use crate::keri::verifier::KeriVerifier;
         let root = Builder::new().prefix("test-db").tempdir().unwrap();
         let db = Arc::new(SledEventDatabase::new(root.path()).unwrap());
         let event_processor = BasicProcessor::new(Arc::clone(&db), None);
@@ -109,7 +109,7 @@ pub mod test {
 
         let signed_block_cesr = signed.to_cesr().unwrap();
 
-        let block_from_cesr = SignedBlock::<KeriSignature>::from_cesr(&signed_block_cesr).unwrap();
+        let block_from_cesr = SignedBlock::<ControllingIdentifier, KeriSignature>::from_cesr(&signed_block_cesr).unwrap();
         assert_eq!(block_from_cesr.block, signed.block);
         assert_eq!(block_from_cesr.signatures, signed.signatures);
     }
@@ -197,7 +197,7 @@ pub mod test {
 
         let serialized_microledger = r#"{"s":["AEOqPFj2zhoKSXkSRxeWNS7NQbvjBTreKhukIxWJKZyAP"],"ci":["DDSJCC9yQkd62kcQk-iW9xA20mgrCrTfWffDiGE_H-_N"]}-CABDDSJCC9yQkd62kcQk-iW9xA20mgrCrTfWffDiGE_H-_N0BA3mV0Ga-e3Ly2yAy2w9PgUbrgglzuDFBh8TQXal1zQlsOYFxWf3x6uqpiVpuiKMddnmMEWGF0iTFgrw07UGSYO{"s":["AEOqPFj2zhoKSXkSRxeWNS7NQbvjBTreKhukIxWJKZyAP"],"p":"AEL_OPgFBnvQ45jaVqygWfEDbdkaPaC_x81yhh8nOmerL","ci":["DDSJCC9yQkd62kcQk-iW9xA20mgrCrTfWffDiGE_H-_N"]}-CABDDSJCC9yQkd62kcQk-iW9xA20mgrCrTfWffDiGE_H-_N0BDQb_cVMsBGFgtxj5JakS1icx3ubheCOvth4U-c9hRsL38msumM7xJHmaTXpCNcNTDRtNw8tS6O5Ki9EuAKxecD{"s":["AEOqPFj2zhoKSXkSRxeWNS7NQbvjBTreKhukIxWJKZyAP"],"p":"AEP-tb9xGrwyHlm_ekDIQIAsvj2lp_el0p2zfUcXEM30I","ci":["DDSJCC9yQkd62kcQk-iW9xA20mgrCrTfWffDiGE_H-_N"]}-CABDDSJCC9yQkd62kcQk-iW9xA20mgrCrTfWffDiGE_H-_N0BDYbWMxzpoec8aYKe0kdE9bUoBizBQZ1R8kZiFbyA9P2iXH5LBaMj9vrbZSxlWQspPfDIDlsitrEYkxuYjc4oQG"#;
 
-        let deserialize_microledger = MicroLedger::<KeriSignature, _>::new_from_cesr(
+        let deserialize_microledger = MicroLedger::<KeriSignature, _,_>::new_from_cesr(
             serialized_microledger.as_bytes(),
             validator,
         )
@@ -215,7 +215,7 @@ pub mod test {
         // test `get_last_block`
         let last = deserialize_microledger.get_last_block().unwrap().clone();
         let sed_last = r#"{"s":["AEOqPFj2zhoKSXkSRxeWNS7NQbvjBTreKhukIxWJKZyAP"],"p":"AEP-tb9xGrwyHlm_ekDIQIAsvj2lp_el0p2zfUcXEM30I","ci":["DDSJCC9yQkd62kcQk-iW9xA20mgrCrTfWffDiGE_H-_N"]}"#;
-        let block: Block = serde_json::from_str(sed_last).unwrap();
+        let block: Block<ControllingIdentifier> = serde_json::from_str(sed_last).unwrap();
         assert_eq!(last, block);
 
         assert_ne!(last, at_micro.get_last_block().unwrap().to_owned());

@@ -1,40 +1,37 @@
 use std::{fmt::Debug, sync::Arc};
 
-use cesrox::{parse, payload::Payload, ParsedData};
 use serde::{Deserialize, Serialize};
 
 use crate::{
-    controlling_identifier::ControllingIdentifier,
     digital_fingerprint::DigitalFingerprint,
     error::Error,
     seals::Seal,
-    signature::{KeriSignature, KeriSignatures, ToCesr},
     verifier::Verifier,
-    Encode,
+    Encode, Identifier,
 };
-pub type Result<T> = std::result::Result<T, Error>;
+use crate::microledger::Result;
 
 #[derive(Clone, Serialize, Deserialize, PartialEq, Debug)]
-pub struct Block {
+pub struct Block<I: Identifier + Serialize> {
     #[serde(rename = "s")]
     pub seals: Vec<Seal>,
     #[serde(rename = "p", skip_serializing_if = "Option::is_none")]
     pub previous: Option<DigitalFingerprint>,
     #[serde(rename = "ci")]
-    pub controlling_identifiers: Vec<ControllingIdentifier>,
+    pub controlling_identifiers: Vec<I>,
 }
 
-impl Encode for Block {
+impl<I: Identifier + Serialize> Encode for Block<I> {
     fn encode(&self) -> Vec<u8> {
         serde_json::to_string(self).unwrap().as_bytes().to_vec()
     }
 }
 
-impl Block {
+impl<I: Identifier + Serialize> Block<I> {
     pub fn new(
         seals: Vec<Seal>,
         previous: Option<DigitalFingerprint>,
-        controlling_identifiers: Vec<ControllingIdentifier>,
+        controlling_identifiers: Vec<I>,
     ) -> Self {
         Self {
             seals,
@@ -43,7 +40,7 @@ impl Block {
         }
     }
 
-    pub fn to_signed_block<S>(self, signatures: Vec<S>) -> SignedBlock<S> {
+    pub fn to_signed_block<S>(self, signatures: Vec<S>) -> SignedBlock<I, S> {
         SignedBlock {
             block: self,
             signatures,
@@ -51,8 +48,8 @@ impl Block {
     }
 }
 
-impl Block {
-    fn check_previous(&self, previous_block: Option<&Block>) -> Result<bool> {
+impl<I: Identifier + Serialize> Block<I> {
+    fn check_previous(&self, previous_block: Option<&Block<I>>) -> Result<bool> {
         match self.previous {
             Some(ref prev) => match previous_block {
                 Some(block) => Ok(prev.verify_binding(&Encode::encode(block))),
@@ -64,14 +61,14 @@ impl Block {
 }
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
-pub struct SignedBlock<S> {
-    pub block: Block,
+pub struct SignedBlock<I: Identifier + Serialize, S> {
+    pub block: Block<I>,
     pub signatures: Vec<S>,
 }
 
 // Checks if signed block matches the given block.
-impl<S: Clone> SignedBlock<S> {
-    pub fn new(block: Block, sigs: Vec<S>) -> Self {
+impl<S: Clone, I: Identifier + Serialize> SignedBlock<I, S> {
+    pub fn new(block: Block<I>, sigs: Vec<S>) -> Self {
         Self {
             block,
             signatures: sigs,
@@ -80,101 +77,49 @@ impl<S: Clone> SignedBlock<S> {
     pub fn verify<V: Verifier<Signature = S>>(
         &self,
         verifier: Arc<V>,
-        controlling_identifiers: Option<Vec<ControllingIdentifier>>,
+        controlling_identifiers: Option<Vec<I>>,
     ) -> Result<bool> {
         // TODO
         // Check controlling identifiers
         verifier.verify(&Encode::encode(&self.block), self.signatures.clone())
     }
 
-    pub fn check_block(&self, block: Option<&Block>) -> Result<bool> {
+    pub fn check_block(&self, block: Option<&Block<I>>) -> Result<bool> {
         Ok(self.block.check_previous(block)?) // && self.check_seals()?)
     }
 }
-impl SignedBlock<KeriSignature> {
-    pub fn to_cesr(&self) -> Result<Vec<u8>> {
-        let payload = Payload::JSON(Encode::encode(&self.block));
-        let att: Vec<cesrox::group::Group> = self
-            .signatures
-            .iter()
-            .map(|a| a.to_cesr_attachment())
-            .collect::<Result<_>>()
-            .unwrap();
-        let d = ParsedData {
-            payload,
-            attachments: att,
-        };
-        Ok(d.to_cesr().unwrap())
-    }
 
-    pub fn from_cesr(stream: &[u8]) -> Result<Self> {
-        let (_rest, parsed) = parse(stream).unwrap();
-        Ok(parsed.into())
-    }
-}
-
-impl From<ParsedData> for SignedBlock<KeriSignature> {
-    fn from(parsed: ParsedData) -> Self {
-        let block: Block = match parsed.payload {
-            Payload::JSON(json) => serde_json::from_slice(&json).unwrap(),
-            Payload::CBOR(_) => todo!(),
-            Payload::MGPK(_) => todo!(),
-        };
-        let signatures: Vec<_> = parsed
-            .attachments
-            .into_iter()
-            .map(|g| {
-                let s: KeriSignatures = g.into();
-                s.0
-            })
-            .flatten()
-            .collect();
-        block.to_signed_block(signatures)
-    }
-}
 
 #[cfg(test)]
+#[cfg(feature = "keri")]
 pub mod test {
-    use std::sync::Arc;
-
-    use cesrox::primitives::codes::self_signing::SelfSigning;
-    use ed25519_dalek::ExpandedSecretKey;
-    use keri::{
-        database::SledEventDatabase,
-        keys::PublicKey,
-        prefix::{BasicPrefix, SelfSigningPrefix},
-        processor::{basic_processor::BasicProcessor, validator::EventValidator},
-    };
-    use rand::rngs::OsRng;
     use sai::derivation::SelfAddressing;
-    use tempfile::Builder;
+    use serde::{Deserialize, Serialize};
 
     use crate::{
-        block::{Block, SignedBlock},
-        controlling_identifier::ControllingIdentifier,
+        block::{Block},
         digital_fingerprint::DigitalFingerprint,
         seals::Seal,
-        signature::KeriSignature,
-        Encode,
+        Encode, Identifier,
     };
+    #[derive(Serialize, Deserialize)]
+    struct EasyIdentifier(String);
+
+    impl Identifier for EasyIdentifier {}
 
     #[test]
     fn test_block_serialization() {
         // generate keypair
-        let kp = ed25519_dalek::Keypair::generate(&mut OsRng {});
-        let (pk, _sk) = (kp.public, kp.secret);
-        let bp = ControllingIdentifier::Keri(keri::prefix::IdentifierPrefix::Basic(
-            BasicPrefix::Ed25519(PublicKey::new(pk.as_bytes().to_vec())),
-        ));
+        let id = EasyIdentifier("Identifier1".to_string());
 
         let seal = SelfAddressing::Blake3_256.derive("exmaple".as_bytes());
         let prev = Some(DigitalFingerprint::SelfAddressing(
             SelfAddressing::Blake3_256.derive("exmaple".as_bytes()),
         ));
-        let block = Block::new(vec![Seal::Attached(seal)], prev, vec![(bp)]);
+        let block = Block::new(vec![Seal::Attached(seal)], prev, vec![(id)]);
         println!("{}", String::from_utf8(block.encode()).unwrap());
 
-        let deserialized_block: Block = serde_json::from_slice(&block.encode()).unwrap();
+        let deserialized_block: Block<EasyIdentifier> = serde_json::from_slice(&block.encode()).unwrap();
         assert_eq!(block.encode(), deserialized_block.encode());
     }
 }

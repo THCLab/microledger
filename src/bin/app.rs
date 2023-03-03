@@ -16,7 +16,7 @@
 // // * help ```cat a.json | ./target/debug/app -h```
 
 // // * Create block that matches to last microledger from a.json. Sets public key
-// // and attachements, save block and attachements in block file
+// // and attachments, save block and attachments in block file
 // // ```cat c.json |
 // // ./target/debug/app next -e dsdsds -e dededeas -c "[207, 33, 70, 140, 190, 73,
 // // 227, 51, 134, 117, 155, 41, 226, 238, 28, 73, 46, 141, 11, 14, 220, 197, 14,

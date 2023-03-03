@@ -4,26 +4,24 @@ use serde::{Deserialize, Serialize};
 
 use crate::error::Error;
 use crate::seal_bundle::SealBundle;
-use crate::signature::KeriSignature;
 use crate::verifier::Verifier;
-use crate::Encode;
+use crate::{Encode, Identifier};
 use crate::{
     block::{Block, SignedBlock},
-    controlling_identifier::ControllingIdentifier,
     digital_fingerprint::DigitalFingerprint,
 };
 
 pub type Result<T> = std::result::Result<T, Error>;
 
 #[derive(Default, Serialize, Deserialize, Debug)]
-pub struct MicroLedger<S: Serialize, V: Verifier<Signature = S>> {
+pub struct MicroLedger<S: Serialize, V: Verifier<Signature = S>, I: Identifier + Serialize> {
     #[serde(rename = "bs")]
-    pub blocks: Vec<SignedBlock<S>>,
+    pub blocks: Vec<SignedBlock<I, S>>,
     #[serde(skip)]
     pub verifier: Arc<V>,
 }
 
-impl<S: Serialize + Clone, V: Verifier<Signature = S>> MicroLedger<S, V> {
+impl<S: Serialize + Clone, V: Verifier<Signature = S>, I: Identifier + Serialize + Clone> MicroLedger<S, V, I> {
     pub fn new(verifier: Arc<V>) -> Self {
         MicroLedger {
             blocks: vec![],
@@ -31,16 +29,16 @@ impl<S: Serialize + Clone, V: Verifier<Signature = S>> MicroLedger<S, V> {
         }
     }
 
-    pub fn append_block(&mut self, signed_block: SignedBlock<S>) -> Result<()> {
+    pub fn append_block(&mut self, signed_block: SignedBlock<I, S>) -> Result<()> {
         self.blocks.append(&mut vec![signed_block]);
         Ok(())
     }
 
     pub fn pre_anchor_block(
         &self,
-        controlling_identifiers: Vec<ControllingIdentifier>,
+        controlling_identifiers: Vec<I>,
         seal_bundle: &SealBundle,
-    ) -> Block {
+    ) -> Block<I> {
         let prev = self
             .blocks
             .last()
@@ -50,7 +48,7 @@ impl<S: Serialize + Clone, V: Verifier<Signature = S>> MicroLedger<S, V> {
         Block::new(seals, prev, controlling_identifiers)
     }
 
-    pub fn anchor(&mut self, block: SignedBlock<S>) -> Result<()> {
+    pub fn anchor(&mut self, block: SignedBlock<I, S>) -> Result<()> {
         let last = self.get_last_block();
         // Checks block binding and signatures.
         if block.check_block(last)?
@@ -65,7 +63,7 @@ impl<S: Serialize + Clone, V: Verifier<Signature = S>> MicroLedger<S, V> {
         }
     }
 
-    pub fn get_last_block(&self) -> Option<&Block> {
+    pub fn get_last_block(&self) -> Option<&Block<I>> {
         self.blocks.last().map(|last| &last.block)
     }
 
@@ -88,14 +86,14 @@ impl<S: Serialize + Clone, V: Verifier<Signature = S>> MicroLedger<S, V> {
         })
     }
 
-    fn current_controlling_identifiers(&self) -> Result<Option<Vec<ControllingIdentifier>>> {
+    fn current_controlling_identifiers(&self) -> Result<Option<Vec<I>>> {
         Ok(self
             .get_last_block()
             .map(|block| block.controlling_identifiers.clone()))
     }
 
     /// Returns block of given fingerprint
-    pub fn get_block(&self, fingerprint: DigitalFingerprint) -> Result<Block> {
+    pub fn get_block(&self, fingerprint: DigitalFingerprint) -> Result<Block<I>> {
         self.blocks
             .iter()
             .find(|b| fingerprint.verify_binding(&Encode::encode(&b.block)))
@@ -106,7 +104,7 @@ impl<S: Serialize + Clone, V: Verifier<Signature = S>> MicroLedger<S, V> {
     fn get_block_by_fingerprint(
         &self,
         fingerprint: &DigitalFingerprint,
-    ) -> Result<&SignedBlock<S>> {
+    ) -> Result<&SignedBlock<I, S>> {
         self.blocks
             .iter()
             .find(|b| fingerprint.verify_binding(&Encode::encode(&b.block)))
@@ -128,23 +126,4 @@ impl<S: Serialize + Clone, V: Verifier<Signature = S>> MicroLedger<S, V> {
     //         .collect();
     //     found_data
     // }
-}
-impl<V: Verifier<Signature = KeriSignature>> MicroLedger<KeriSignature, V> {
-    pub fn new_from_cesr(stream: &[u8], verifier: Arc<V>) -> Result<Self> {
-        let (_rest, parsed_stream) = cesrox::parse_many(stream).unwrap();
-        let mut microledger = MicroLedger::new(verifier);
-        parsed_stream
-            .into_iter()
-            .for_each(|pd| microledger.append_block(pd.into()).unwrap());
-        Ok(microledger)
-    }
-
-    pub fn to_cesr(&self) -> Result<Vec<u8>> {
-        Ok(self
-            .blocks
-            .iter()
-            .map(|bl| bl.to_cesr().unwrap())
-            .flatten()
-            .collect())
-    }
 }

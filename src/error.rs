@@ -1,3 +1,4 @@
+#[cfg(feature = "keri")]
 use keri::prefix::error::Error as PrefixError;
 use thiserror::Error;
 
@@ -11,6 +12,7 @@ pub enum Error {
     SealError(String),
     #[error("Signature verification error")]
     SignatureVerificationError,
+    #[cfg(feature = "keri")]
     #[error(transparent)]
     BasicPrefixError(#[from] PrefixError),
 }
