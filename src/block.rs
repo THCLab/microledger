@@ -3,11 +3,11 @@ use std::{fmt::Debug, sync::Arc};
 use serde::{Deserialize, Serialize};
 use thiserror::Error;
 
-use crate::Result;
 use crate::{
     digital_fingerprint::DigitalFingerprint, error::Error, seals::Seal, verifier::Verifier, Encode,
     Identifier,
 };
+use crate::{Result, Signature};
 
 #[derive(Error, Debug)]
 pub enum BlockError {
@@ -46,7 +46,10 @@ impl<I: Identifier + Serialize> Block<I> {
         }
     }
 
-    pub fn to_signed_block<S>(self, signatures: Vec<S>) -> SignedBlock<I, S> {
+    pub fn to_signed_block<S: Signature<Identifier = I>>(
+        self,
+        signatures: Vec<S>,
+    ) -> SignedBlock<I, S> {
         SignedBlock {
             block: self,
             signatures,
@@ -67,30 +70,39 @@ impl<I: Identifier + Serialize> Block<I> {
 }
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
-pub struct SignedBlock<I: Identifier + Serialize, S> {
+pub struct SignedBlock<I, S>
+where
+    I: Identifier + Serialize,
+    S: Signature<Identifier = I>,
+{
     pub block: Block<I>,
     pub signatures: Vec<S>,
 }
 
 // Checks if signed block matches the given block.
-impl<S: Clone, I: Identifier + Serialize> SignedBlock<I, S> {
+impl<S, I> SignedBlock<I, S>
+where
+    S: Clone + Signature<Identifier = I>,
+    I: Identifier + Serialize + PartialEq,
+{
     pub fn new(block: Block<I>, sigs: Vec<S>) -> Self {
         Self {
             block,
             signatures: sigs,
         }
     }
-    pub fn verify<V: Verifier<Signature = S>>(
-        &self,
-        verifier: Arc<V>,
-        _controlling_identifiers: Option<Vec<I>>,
-    ) -> Result<bool> {
-        // TODO
-        // Check controlling identifiers
+    pub fn verify<V: Verifier<Signature = S>>(&self, verifier: Arc<V>) -> Result<bool> {
         verifier.verify(&Encode::encode(&self.block)?, self.signatures.clone())
     }
 
-    pub fn check_block(&self, block: Option<&Block<I>>) -> Result<bool> {
+    pub fn check_controlling_identifiers(&self, controlling_identifiers: &[I]) -> bool {
+        self.signatures
+            .iter()
+            .filter_map(|signature| signature.get_signer())
+            .all(|signer| controlling_identifiers.contains(&signer))
+    }
+
+    pub fn check_previous_block(&self, block: Option<&Block<I>>) -> Result<bool> {
         self.block.check_previous(block) // && self.check_seals()?)
     }
 }

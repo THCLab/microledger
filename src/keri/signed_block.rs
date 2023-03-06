@@ -104,7 +104,7 @@ mod test {
         )]));
 
         let signed = block.to_signed_block(vec![sig]);
-        assert!(signed.verify(validator, None)?);
+        assert!(signed.verify(validator)?);
 
         let signed_block_cesr = signed.to_cesr()?;
 

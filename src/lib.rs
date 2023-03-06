@@ -21,3 +21,7 @@ pub trait Encode {
 /// Controlling identifiers can be anything that is considered identifiable within given network,
 /// ie. `Public Key`, `DID`, `KERI` prefix and so on.
 pub trait Identifier {}
+pub trait Signature {
+    type Identifier;
+    fn get_signer(&self) -> Option<Self::Identifier>;
+}

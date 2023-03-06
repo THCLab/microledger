@@ -10,7 +10,7 @@ use crate::{
     digital_fingerprint::DigitalFingerprint,
     Result,
 };
-use crate::{Encode, Identifier};
+use crate::{Encode, Identifier, Signature};
 
 #[derive(Error, Debug)]
 pub enum MicroledgerError {
@@ -18,12 +18,14 @@ pub enum MicroledgerError {
     MissingBlock(DigitalFingerprint),
     #[error("Block doesn't match")]
     WrongBlock,
+    #[error("Signatures doesn't match controlling identifier")]
+    WrongSigner,
 }
 
 #[derive(Default, Serialize, Deserialize, Debug)]
 pub struct MicroLedger<S, V, I>
 where
-    S: Serialize,
+    S: Serialize + Signature<Identifier = I>,
     V: Verifier<Signature = S>,
     I: Identifier + Serialize,
 {
@@ -35,9 +37,9 @@ where
 
 impl<S, V, I> MicroLedger<S, V, I>
 where
-    S: Serialize + Clone,
+    S: Serialize + Clone + Signature<Identifier = I>,
     V: Verifier<Signature = S>,
-    I: Identifier + Serialize + Clone,
+    I: Identifier + Serialize + Clone + PartialEq,
 {
     pub fn new(verifier: Arc<V>) -> Self {
         MicroLedger {
@@ -72,12 +74,23 @@ where
 
     pub fn anchor(&mut self, block: SignedBlock<I, S>) -> Result<()> {
         let last = self.get_last_block();
+        let controllers_check = match self.current_controlling_identifiers() {
+            // Provided signatures creators should match controlling identifiers
+            // designated in last block
+            Some(controllers) => block
+                .check_controlling_identifiers(&controllers)
+                .then_some(true)
+                .ok_or(MicroledgerError::WrongSigner)?,
+            // It's first block, check controlling identifeir from itself
+            None => block
+                .check_controlling_identifiers(&block.block.controlling_identifiers)
+                .then_some(true)
+                .ok_or(MicroledgerError::WrongSigner)?,
+        };
         // Checks block binding and signatures.
-        if block.check_block(last)?
-            && block.verify(
-                self.verifier.clone(),
-                self.current_controlling_identifiers()?,
-            )?
+        if block.check_previous_block(last)?
+            && block.verify(self.verifier.clone())?
+            && controllers_check
         {
             self.append_block(block)
         } else {
@@ -107,10 +120,9 @@ where
         }
     }
 
-    fn current_controlling_identifiers(&self) -> Result<Option<Vec<I>>> {
-        Ok(self
-            .get_last_block()
-            .map(|block| block.controlling_identifiers.clone()))
+    fn current_controlling_identifiers(&self) -> Option<Vec<I>> {
+        self.get_last_block()
+            .map(|block| block.controlling_identifiers.clone())
     }
 
     /// Returns block of given fingerprint

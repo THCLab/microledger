@@ -13,13 +13,12 @@ use rand::rngs::OsRng;
 use tempfile::Builder;
 
 use crate::{
-    Result,
     block::Block,
     digital_fingerprint::DigitalFingerprint,
     keri::{verifier::KeriVerifier, KeriSignature},
     microledger::MicroLedger,
     seal_bundle::{SealBundle, SealData},
-    Encode
+    Encode, Result,
 };
 
 #[test]
@@ -81,10 +80,7 @@ fn test_microledger() -> Result<()> {
 
     // let blocks = microledger.blocks;
     // println!("{}", serde_json::to_string(&blocks).unwrap());
-    println!(
-        "{}",
-        String::from_utf8(microledger.to_cesr()?).unwrap()
-    );
+    println!("{}", String::from_utf8(microledger.to_cesr()?).unwrap());
     Ok(())
 }
 
@@ -101,7 +97,6 @@ fn test_microledger_traversing() -> Result<()> {
         serialized_microledger.as_bytes(),
         validator,
     )?;
-    ;
     assert_eq!(3, deserialize_microledger.blocks.len());
 
     let second_block_id: DigitalFingerprint = "AEP-tb9xGrwyHlm_ekDIQIAsvj2lp_el0p2zfUcXEM30I"

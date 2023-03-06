@@ -2,7 +2,9 @@ use std::{convert::TryInto, sync::Arc};
 
 use keri::prefix::IdentifierPrefix;
 
-use crate::{error::Error, microledger::MicroLedger, verifier::Verifier, Identifier, Result};
+use crate::{
+    error::Error, microledger::MicroLedger, verifier::Verifier, Identifier, Result, Signature,
+};
 
 pub mod signed_block;
 #[cfg(test)]
@@ -12,6 +14,14 @@ pub mod verifier;
 pub type KeriSignature = keri::event_message::signature::Signature;
 
 impl Identifier for IdentifierPrefix {}
+
+impl Signature for KeriSignature {
+    type Identifier = IdentifierPrefix;
+
+    fn get_signer(&self) -> Option<Self::Identifier> {
+        self.get_signer()
+    }
+}
 
 impl<V> MicroLedger<KeriSignature, V, IdentifierPrefix>
 where
