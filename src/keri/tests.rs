@@ -18,11 +18,11 @@ use crate::{
     keri::{verifier::KeriVerifier, KeriSignature},
     microledger::MicroLedger,
     seal_bundle::{SealBundle, SealData},
-    Encode,
+    Encode, Result,
 };
 
 #[test]
-fn test_microledger() {
+fn test_microledger() -> Result<()> {
     let root = Builder::new().prefix("test-db").tempdir().unwrap();
     let db = Arc::new(SledEventDatabase::new(root.path()).unwrap());
     let _event_processor = BasicProcessor::new(Arc::clone(&db), None);
@@ -37,7 +37,7 @@ fn test_microledger() {
 
     let mut microledger = MicroLedger::new(validator);
     let seals = SealBundle::new().attach(SealData::AttachedData("hello".into()));
-    let block = microledger.pre_anchor_block(vec![(bp.clone())], &seals);
+    let block = microledger.pre_anchor_block(vec![(bp.clone())], &seals)?;
 
     let sign = |data| {
         ExpandedSecretKey::from(&sk)
@@ -46,45 +46,33 @@ fn test_microledger() {
             .to_vec()
     };
 
+    let encoded = block.encode()?;
     let signatures = KeriSignature::NonTransferable(Nontransferable::Couplet(vec![(
         pref.clone(),
-        SelfSigningPrefix::new(SelfSigning::Ed25519Sha512, sign(&block.encode())),
+        SelfSigningPrefix::new(SelfSigning::Ed25519Sha512, sign(&encoded)),
     )]));
 
     let signed = block.to_signed_block(vec![signatures]);
     microledger.anchor(signed).unwrap();
 
     let seals = SealBundle::new().attach(SealData::AttachedData("hello".into()));
-    let block = microledger.pre_anchor_block(vec![(bp.clone())], &seals);
+    let block = microledger.pre_anchor_block(vec![(bp.clone())], &seals)?;
 
-    let sign = |data| {
-        ExpandedSecretKey::from(&sk)
-            .sign(data, &pk)
-            .as_ref()
-            .to_vec()
-    };
-
+    let encoded_block = block.encode()?;
     let signatures = KeriSignature::NonTransferable(Nontransferable::Couplet(vec![(
         pref.clone(),
-        SelfSigningPrefix::new(SelfSigning::Ed25519Sha512, sign(&block.encode())),
+        SelfSigningPrefix::new(SelfSigning::Ed25519Sha512, sign(&encoded_block)),
     )]));
 
     let signed = block.to_signed_block(vec![signatures]);
     microledger.anchor(signed).unwrap();
 
     let seals = SealBundle::new().attach(SealData::AttachedData("hello".into()));
-    let block = microledger.pre_anchor_block(vec![(bp)], &seals);
-
-    let sign = |data| {
-        ExpandedSecretKey::from(&sk)
-            .sign(data, &pk)
-            .as_ref()
-            .to_vec()
-    };
+    let block = microledger.pre_anchor_block(vec![(bp)], &seals)?;
 
     let signatures = KeriSignature::NonTransferable(Nontransferable::Couplet(vec![(
         pref,
-        SelfSigningPrefix::new(SelfSigning::Ed25519Sha512, sign(&block.encode())),
+        SelfSigningPrefix::new(SelfSigning::Ed25519Sha512, sign(&block.encode()?)),
     )]));
 
     let signed = block.to_signed_block(vec![signatures]);
@@ -96,6 +84,7 @@ fn test_microledger() {
         "{}",
         String::from_utf8(microledger.to_cesr().unwrap()).unwrap()
     );
+    Ok(())
 }
 
 #[test]

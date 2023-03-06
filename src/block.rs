@@ -2,7 +2,7 @@ use std::{fmt::Debug, sync::Arc};
 
 use serde::{Deserialize, Serialize};
 
-use crate::microledger::Result;
+use crate::Result;
 use crate::{
     digital_fingerprint::DigitalFingerprint, error::Error, seals::Seal, verifier::Verifier, Encode,
     Identifier,
@@ -19,8 +19,10 @@ pub struct Block<I: Identifier + Serialize> {
 }
 
 impl<I: Identifier + Serialize> Encode for Block<I> {
-    fn encode(&self) -> Vec<u8> {
-        serde_json::to_string(self).unwrap().as_bytes().to_vec()
+    fn encode(&self) -> Result<Vec<u8>> {
+        serde_json::to_string(self)
+            .map(|encoded| encoded.as_bytes().to_vec())
+            .map_err(Error::EncodeError)
     }
 }
 
@@ -49,7 +51,7 @@ impl<I: Identifier + Serialize> Block<I> {
     fn check_previous(&self, previous_block: Option<&Block<I>>) -> Result<bool> {
         match self.previous {
             Some(ref prev) => match previous_block {
-                Some(block) => Ok(prev.verify_binding(&Encode::encode(block))),
+                Some(block) => Ok(prev.verify_binding(&Encode::encode(block)?)),
                 None => Err(Error::BlockError("Incorect blocks binding".into())),
             },
             None => Ok(previous_block.is_none()),
@@ -78,7 +80,7 @@ impl<S: Clone, I: Identifier + Serialize> SignedBlock<I, S> {
     ) -> Result<bool> {
         // TODO
         // Check controlling identifiers
-        verifier.verify(&Encode::encode(&self.block), self.signatures.clone())
+        verifier.verify(&Encode::encode(&self.block)?, self.signatures.clone())
     }
 
     pub fn check_block(&self, block: Option<&Block<I>>) -> Result<bool> {

@@ -3,14 +3,14 @@ use keri::event_message::signature::{get_signatures, signatures_into_groups};
 use keri::prefix::IdentifierPrefix;
 
 use crate::block::Block;
-use crate::microledger::Result;
+use crate::Result;
 use crate::{block::SignedBlock, Encode};
 
 use super::KeriSignature;
 
 impl SignedBlock<IdentifierPrefix, KeriSignature> {
     pub fn to_cesr(&self) -> Result<Vec<u8>> {
-        let payload = Payload::JSON(Encode::encode(&self.block));
+        let payload = Payload::JSON(Encode::encode(&self.block)?);
         let groups = signatures_into_groups(&self.signatures);
 
         let d = ParsedData {
@@ -64,11 +64,11 @@ mod test {
         digital_fingerprint::DigitalFingerprint,
         keri::KeriSignature,
         seals::Seal,
-        Encode,
+        Encode, Result,
     };
 
     #[test]
-    fn test_signed_block() {
+    fn test_signed_block() -> Result<()> {
         use crate::keri::verifier::KeriVerifier;
         let root = Builder::new().prefix("test-db").tempdir().unwrap();
         let db = Arc::new(SledEventDatabase::new(root.path()).unwrap());
@@ -95,7 +95,7 @@ mod test {
 
         let sig = KeriSignature::NonTransferable(Nontransferable::Couplet(vec![(
             pref,
-            SelfSigningPrefix::new(SelfSigning::Ed25519Sha512, sign(&block.encode())),
+            SelfSigningPrefix::new(SelfSigning::Ed25519Sha512, sign(&block.encode()?)),
         )]));
 
         let signed = block.to_signed_block(vec![sig]);
@@ -107,5 +107,7 @@ mod test {
             SignedBlock::<IdentifierPrefix, KeriSignature>::from_cesr(&signed_block_cesr).unwrap();
         assert_eq!(block_from_cesr.block, signed.block);
         assert_eq!(block_from_cesr.signatures, signed.signatures);
+
+        Ok(())
     }
 }

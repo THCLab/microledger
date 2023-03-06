@@ -1,3 +1,5 @@
+use error::Error;
+
 pub mod block;
 pub mod digital_fingerprint;
 pub mod error;
@@ -8,8 +10,10 @@ pub mod seal_bundle;
 pub mod seals;
 pub mod verifier;
 
+pub type Result<T> = std::result::Result<T, Error>;
+
 pub trait Encode {
-    fn encode(&self) -> Vec<u8>;
+    fn encode(&self) -> Result<Vec<u8>>;
 }
 
 /// Controlling identifier describes control authority over the Microledger in a given block.

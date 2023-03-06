@@ -3,7 +3,7 @@ pub(crate) mod helpers {
     use ed25519_dalek::{PublicKey, Signature as EdLibSignature, Verifier as EdLibVerifier};
     use serde::{Deserialize, Serialize};
 
-    use microledger::{verifier::Verifier, Identifier};
+    use microledger::{verifier::Verifier, Identifier, Result};
 
     #[derive(Serialize, Deserialize, Clone)]
     pub struct EasyIdentifier(pub String);
@@ -17,11 +17,7 @@ pub(crate) mod helpers {
     impl Verifier for EdVerifier {
         type Signature = EdSignature;
 
-        fn verify(
-            &self,
-            data: &[u8],
-            s: Vec<Self::Signature>,
-        ) -> microledger::microledger::Result<bool> {
+        fn verify(&self, data: &[u8], s: Vec<Self::Signature>) -> Result<bool> {
             Ok(s.iter().all(|sig| {
                 let raw_sig = general_purpose::STANDARD_NO_PAD.decode(&sig.0).unwrap();
                 self.0
@@ -46,13 +42,13 @@ pub mod test {
         microledger::MicroLedger,
         seal_bundle::{SealBundle, SealData},
         seals::Seal,
-        Encode,
+        Encode, Result,
     };
 
     use crate::helpers::{EasyIdentifier, EdSignature, EdVerifier};
 
     #[test]
-    fn test_block_serialization() {
+    fn test_block_serialization() -> Result<()> {
         // generate keypair
         let id = EasyIdentifier("Identifier1".to_string());
 
@@ -61,15 +57,16 @@ pub mod test {
             SelfAddressing::Blake3_256.derive("exmaple".as_bytes()),
         ));
         let block = Block::new(vec![Seal::Attached(seal)], prev, vec![(id)]);
-        println!("{}", String::from_utf8(block.encode()).unwrap());
+        println!("{}", String::from_utf8(block.encode()?).unwrap());
 
         let deserialized_block: Block<EasyIdentifier> =
-            serde_json::from_slice(&block.encode()).unwrap();
-        assert_eq!(block.encode(), deserialized_block.encode());
+            serde_json::from_slice(&block.encode()?).unwrap();
+        assert_eq!(block.encode()?, deserialized_block.encode()?);
+        Ok(())
     }
 
     #[test]
-    fn test_microledger() {
+    fn test_microledger() -> Result<()> {
         // generate keypair and setup verifier
         let kp = ed25519_dalek::Keypair::generate(&mut OsRng {});
         let pk = kp.public;
@@ -79,7 +76,7 @@ pub mod test {
 
         let mut microledger = MicroLedger::new(validator);
         let seals = SealBundle::new().attach(SealData::AttachedData("hello".into()));
-        let block = microledger.pre_anchor_block(vec![(identifier.clone())], &seals);
+        let block = microledger.pre_anchor_block(vec![(identifier.clone())], &seals)?;
 
         let sign = |data: Vec<u8>| kp.sign(&data).as_ref().to_vec();
 
@@ -92,16 +89,16 @@ pub mod test {
         assert!(microledger.anchor(signed).is_err());
         assert!(microledger.blocks.is_empty());
 
-        let b64_signature = general_purpose::STANDARD_NO_PAD.encode(sign(block.encode()));
+        let b64_signature = general_purpose::STANDARD_NO_PAD.encode(sign(block.encode()?));
 
         let signed = block.to_signed_block(vec![EdSignature(b64_signature)]);
         microledger.anchor(signed).unwrap();
         assert_eq!(microledger.blocks.len(), 1);
 
         let seals = SealBundle::new().attach(SealData::AttachedData("hello2".into()));
-        let block = microledger.pre_anchor_block(vec![(identifier.clone())], &seals);
+        let block = microledger.pre_anchor_block(vec![(identifier.clone())], &seals)?;
 
-        let b64_signature = general_purpose::STANDARD_NO_PAD.encode(sign(block.encode()));
+        let b64_signature = general_purpose::STANDARD_NO_PAD.encode(sign(block.encode()?));
 
         let signed = block.to_signed_block(vec![EdSignature(b64_signature)]);
         microledger.anchor(signed).unwrap();
@@ -109,5 +106,7 @@ pub mod test {
 
         let blocks = microledger.blocks;
         println!("{}", serde_json::to_string(&blocks).unwrap());
+
+        Ok(())
     }
 }

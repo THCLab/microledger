@@ -2,7 +2,7 @@ use std::sync::Arc;
 
 use keri::{database::SledEventDatabase, processor::validator::EventValidator};
 
-use crate::{microledger::Result, verifier::Verifier};
+use crate::{verifier::Verifier, Result};
 
 use super::KeriSignature;
 

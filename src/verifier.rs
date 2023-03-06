@@ -1,4 +1,4 @@
-use crate::microledger::Result;
+use crate::Result;
 pub trait Verifier {
     type Signature;
 

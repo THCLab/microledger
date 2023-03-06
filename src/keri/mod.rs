@@ -2,11 +2,7 @@ use std::sync::Arc;
 
 use keri::prefix::IdentifierPrefix;
 
-use crate::{
-    microledger::{MicroLedger, Result},
-    verifier::Verifier,
-    Identifier,
-};
+use crate::{error::Error, microledger::MicroLedger, verifier::Verifier, Identifier, Result};
 
 pub mod signed_block;
 #[cfg(test)]
@@ -22,7 +18,7 @@ where
     V: Verifier<Signature = KeriSignature>,
 {
     pub fn new_from_cesr(stream: &[u8], verifier: Arc<V>) -> Result<Self> {
-        let (_rest, parsed_stream) = cesrox::parse_many(stream).unwrap();
+        let (_rest, parsed_stream) = cesrox::parse_many(stream).map_err(|e| Error::CesrError)?;
         let mut microledger = MicroLedger::new(verifier);
         parsed_stream
             .into_iter()

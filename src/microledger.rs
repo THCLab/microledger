@@ -1,6 +1,7 @@
 use std::sync::Arc;
 
 use serde::{Deserialize, Serialize};
+use thiserror::Error;
 
 use crate::error::Error;
 use crate::seal_bundle::SealBundle;
@@ -8,10 +9,17 @@ use crate::verifier::Verifier;
 use crate::{
     block::{Block, SignedBlock},
     digital_fingerprint::DigitalFingerprint,
+    Result,
 };
 use crate::{Encode, Identifier};
 
-pub type Result<T> = std::result::Result<T, Error>;
+#[derive(Error, Debug)]
+pub enum MicroledgerError {
+    #[error("No block of given fingerprint: {0}")]
+    MissingBlock(DigitalFingerprint),
+    #[error("Block doesn't match")]
+    WrongBlock,
+}
 
 #[derive(Default, Serialize, Deserialize, Debug)]
 pub struct MicroLedger<S, V, I>
@@ -48,14 +56,19 @@ where
         &self,
         controlling_identifiers: Vec<I>,
         seal_bundle: &SealBundle,
-    ) -> Block<I> {
+    ) -> Result<Block<I>> {
         let prev = self
             .blocks
             .last()
-            .map(|sb| DigitalFingerprint::derive(&Encode::encode(&sb.block)));
+            .map(|sb| -> Result<_> { Ok(DigitalFingerprint::derive(&Encode::encode(&sb.block)?)) });
 
+        let prev = match prev {
+            Some(Ok(sp)) => Some(sp),
+            Some(Err(e)) => return Err(e),
+            None => None,
+        };
         let seals = seal_bundle.get_fingerprints();
-        Block::new(seals, prev, controlling_identifiers)
+        Ok(Block::new(seals, prev, controlling_identifiers))
     }
 
     pub fn anchor(&mut self, block: SignedBlock<I, S>) -> Result<()> {
@@ -69,7 +82,7 @@ where
         {
             self.append_block(block)
         } else {
-            Err(Error::MicroError("Wrong block".into()))
+            Err(MicroledgerError::WrongBlock.into())
         }
     }
 
@@ -82,7 +95,10 @@ where
         let position = self
             .blocks
             .iter()
-            .position(|b| block_id.verify_binding(&Encode::encode(&b.block)));
+            .position(|b| match Encode::encode(&b.block) {
+                Ok(block) => block_id.verify_binding(&block),
+                Err(_) => false,
+            });
         // .take_while(|b| !block_id.verify_binding(&Serialization::serialize(&b.block))).collect();
         let blocks: Vec<_> = self
             .blocks
@@ -106,9 +122,9 @@ where
     pub fn get_block(&self, fingerprint: DigitalFingerprint) -> Result<Block<I>> {
         self.blocks
             .iter()
-            .find(|b| fingerprint.verify_binding(&Encode::encode(&b.block)))
+            .find(|b| Encode::encode(&b.block).map_or(false, |x| fingerprint.verify_binding(&x)))
             .map(|b| b.block.clone())
-            .ok_or_else(|| Error::MicroError("No block of given fingerprint".into()))
+            .ok_or_else(|| MicroledgerError::MissingBlock(fingerprint.clone()).into())
     }
 
     pub fn get_block_by_fingerprint(
@@ -117,8 +133,8 @@ where
     ) -> Result<&SignedBlock<I, S>> {
         self.blocks
             .iter()
-            .find(|b| fingerprint.verify_binding(&Encode::encode(&b.block)))
-            .ok_or_else(|| Error::MicroError("No block of given fingerprint".into()))
+            .find(|b| Encode::encode(&b.block).map_or(false, |x| fingerprint.verify_binding(&x)))
+            .ok_or_else(|| MicroledgerError::MissingBlock(fingerprint.clone()).into())
     }
 
     // pub fn get_seal_datums(&self, fingerprint: &DigitalFingerprint) -> Result<Vec<String>> {
