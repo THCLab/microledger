@@ -1,8 +1,11 @@
+use std::convert::{TryFrom, TryInto};
+
 use cesrox::{parse, payload::Payload, ParsedData};
 use keri::event_message::signature::{get_signatures, signatures_into_groups};
 use keri::prefix::IdentifierPrefix;
 
 use crate::block::Block;
+use crate::error::Error;
 use crate::Result;
 use crate::{block::SignedBlock, Encode};
 
@@ -17,19 +20,21 @@ impl SignedBlock<IdentifierPrefix, KeriSignature> {
             payload,
             attachments: groups,
         };
-        Ok(d.to_cesr().unwrap())
+        d.to_cesr().map_err(|_e| Error::CesrError)
     }
 
     pub fn from_cesr(stream: &[u8]) -> Result<Self> {
-        let (_rest, parsed) = parse(stream).unwrap();
-        Ok(parsed.into())
+        let (_rest, parsed) = parse(stream).map_err(|_e| Error::CesrError)?;
+        parsed.try_into()
     }
 }
 
-impl From<ParsedData> for SignedBlock<IdentifierPrefix, KeriSignature> {
-    fn from(parsed: ParsedData) -> Self {
+impl TryFrom<ParsedData> for SignedBlock<IdentifierPrefix, KeriSignature> {
+    type Error = Error;
+
+    fn try_from(parsed: ParsedData) -> std::result::Result<Self, Self::Error> {
         let block: Block<IdentifierPrefix> = match parsed.payload {
-            Payload::JSON(json) => serde_json::from_slice(&json).unwrap(),
+            Payload::JSON(json) => serde_json::from_slice(&json).map_err(Error::EncodeError)?,
             Payload::CBOR(_) => todo!(),
             Payload::MGPK(_) => todo!(),
         };
@@ -38,7 +43,7 @@ impl From<ParsedData> for SignedBlock<IdentifierPrefix, KeriSignature> {
             .into_iter()
             .flat_map(|g| get_signatures(g).unwrap())
             .collect();
-        block.to_signed_block(signatures)
+        Ok(block.to_signed_block(signatures))
     }
 }
 
@@ -99,12 +104,12 @@ mod test {
         )]));
 
         let signed = block.to_signed_block(vec![sig]);
-        assert!(signed.verify(validator, None).unwrap());
+        assert!(signed.verify(validator, None)?);
 
-        let signed_block_cesr = signed.to_cesr().unwrap();
+        let signed_block_cesr = signed.to_cesr()?;
 
         let block_from_cesr =
-            SignedBlock::<IdentifierPrefix, KeriSignature>::from_cesr(&signed_block_cesr).unwrap();
+            SignedBlock::<IdentifierPrefix, KeriSignature>::from_cesr(&signed_block_cesr)?;
         assert_eq!(block_from_cesr.block, signed.block);
         assert_eq!(block_from_cesr.signatures, signed.signatures);
 

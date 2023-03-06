@@ -1,4 +1,4 @@
-use std::sync::Arc;
+use std::{convert::TryInto, sync::Arc};
 
 use keri::prefix::IdentifierPrefix;
 
@@ -18,11 +18,11 @@ where
     V: Verifier<Signature = KeriSignature>,
 {
     pub fn new_from_cesr(stream: &[u8], verifier: Arc<V>) -> Result<Self> {
-        let (_rest, parsed_stream) = cesrox::parse_many(stream).map_err(|e| Error::CesrError)?;
+        let (_rest, parsed_stream) = cesrox::parse_many(stream).map_err(|_e| Error::CesrError)?;
         let mut microledger = MicroLedger::new(verifier);
         parsed_stream
             .into_iter()
-            .for_each(|pd| microledger.append_block(pd.into()).unwrap());
+            .try_for_each(|pd| microledger.append_block(pd.try_into()?))?;
         Ok(microledger)
     }
 

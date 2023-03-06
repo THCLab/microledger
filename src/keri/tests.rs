@@ -13,12 +13,13 @@ use rand::rngs::OsRng;
 use tempfile::Builder;
 
 use crate::{
+    Result,
     block::Block,
     digital_fingerprint::DigitalFingerprint,
     keri::{verifier::KeriVerifier, KeriSignature},
     microledger::MicroLedger,
     seal_bundle::{SealBundle, SealData},
-    Encode, Result,
+    Encode
 };
 
 #[test]
@@ -53,7 +54,7 @@ fn test_microledger() -> Result<()> {
     )]));
 
     let signed = block.to_signed_block(vec![signatures]);
-    microledger.anchor(signed).unwrap();
+    microledger.anchor(signed)?;
 
     let seals = SealBundle::new().attach(SealData::AttachedData("hello".into()));
     let block = microledger.pre_anchor_block(vec![(bp.clone())], &seals)?;
@@ -65,7 +66,7 @@ fn test_microledger() -> Result<()> {
     )]));
 
     let signed = block.to_signed_block(vec![signatures]);
-    microledger.anchor(signed).unwrap();
+    microledger.anchor(signed)?;
 
     let seals = SealBundle::new().attach(SealData::AttachedData("hello".into()));
     let block = microledger.pre_anchor_block(vec![(bp)], &seals)?;
@@ -76,19 +77,19 @@ fn test_microledger() -> Result<()> {
     )]));
 
     let signed = block.to_signed_block(vec![signatures]);
-    microledger.anchor(signed).unwrap();
+    microledger.anchor(signed)?;
 
     // let blocks = microledger.blocks;
     // println!("{}", serde_json::to_string(&blocks).unwrap());
     println!(
         "{}",
-        String::from_utf8(microledger.to_cesr().unwrap()).unwrap()
+        String::from_utf8(microledger.to_cesr()?).unwrap()
     );
     Ok(())
 }
 
 #[test]
-fn test_microledger_traversing() {
+fn test_microledger_traversing() -> Result<()> {
     let root = Builder::new().prefix("test-db").tempdir().unwrap();
     let db = Arc::new(SledEventDatabase::new(root.path()).unwrap());
     let _event_processor = BasicProcessor::new(Arc::clone(&db), None);
@@ -99,8 +100,8 @@ fn test_microledger_traversing() {
     let deserialize_microledger = MicroLedger::<KeriSignature, _, _>::new_from_cesr(
         serialized_microledger.as_bytes(),
         validator,
-    )
-    .unwrap();
+    )?;
+    ;
     assert_eq!(3, deserialize_microledger.blocks.len());
 
     let second_block_id: DigitalFingerprint = "AEP-tb9xGrwyHlm_ekDIQIAsvj2lp_el0p2zfUcXEM30I"
@@ -125,4 +126,5 @@ fn test_microledger_traversing() {
     //     .unwrap();
     // assert_eq!(seals.len(), 1);
     // assert_eq!(seals[0], "one more message");
+    Ok(())
 }

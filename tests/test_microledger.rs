@@ -92,7 +92,7 @@ pub mod test {
         let b64_signature = general_purpose::STANDARD_NO_PAD.encode(sign(block.encode()?));
 
         let signed = block.to_signed_block(vec![EdSignature(b64_signature)]);
-        microledger.anchor(signed).unwrap();
+        microledger.anchor(signed)?;
         assert_eq!(microledger.blocks.len(), 1);
 
         let seals = SealBundle::new().attach(SealData::AttachedData("hello2".into()));
@@ -101,7 +101,7 @@ pub mod test {
         let b64_signature = general_purpose::STANDARD_NO_PAD.encode(sign(block.encode()?));
 
         let signed = block.to_signed_block(vec![EdSignature(b64_signature)]);
-        microledger.anchor(signed).unwrap();
+        microledger.anchor(signed)?;
         assert_eq!(microledger.blocks.len(), 2);
 
         let blocks = microledger.blocks;

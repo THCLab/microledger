@@ -2,7 +2,7 @@
 use keri::prefix::error::Error as PrefixError;
 use thiserror::Error;
 
-use crate::microledger::MicroledgerError;
+use crate::{block::BlockError, microledger::MicroledgerError};
 
 #[derive(Error, Debug)]
 pub enum Error {
@@ -10,7 +10,7 @@ pub enum Error {
     MicroError(#[from] MicroledgerError),
 
     #[error("{0}")]
-    BlockError(String),
+    BlockError(#[from] BlockError),
 
     #[error("{0}")]
     SealError(String),

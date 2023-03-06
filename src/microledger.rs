@@ -3,7 +3,6 @@ use std::sync::Arc;
 use serde::{Deserialize, Serialize};
 use thiserror::Error;
 
-use crate::error::Error;
 use crate::seal_bundle::SealBundle;
 use crate::verifier::Verifier;
 use crate::{
@@ -95,21 +94,17 @@ where
         let position = self
             .blocks
             .iter()
-            .position(|b| match Encode::encode(&b.block) {
-                Ok(block) => block_id.verify_binding(&block),
-                Err(_) => false,
-            });
+            .position(|b| Encode::encode(&b.block).map_or(false, |x| block_id.verify_binding(&x)));
         // .take_while(|b| !block_id.verify_binding(&Serialization::serialize(&b.block))).collect();
-        let blocks: Vec<_> = self
-            .blocks
-            .clone()
-            .into_iter()
-            .take(position.unwrap() + 1)
-            .collect();
-        Some(Self {
-            blocks,
-            verifier: self.verifier.clone(),
-        })
+        if let Some(position) = position {
+            let blocks: Vec<_> = self.blocks.clone().into_iter().take(position + 1).collect();
+            Some(Self {
+                blocks,
+                verifier: self.verifier.clone(),
+            })
+        } else {
+            None
+        }
     }
 
     fn current_controlling_identifiers(&self) -> Result<Option<Vec<I>>> {

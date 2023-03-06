@@ -1,12 +1,19 @@
 use std::{fmt::Debug, sync::Arc};
 
 use serde::{Deserialize, Serialize};
+use thiserror::Error;
 
 use crate::Result;
 use crate::{
     digital_fingerprint::DigitalFingerprint, error::Error, seals::Seal, verifier::Verifier, Encode,
     Identifier,
 };
+
+#[derive(Error, Debug)]
+pub enum BlockError {
+    #[error("Incorect previous block binding")]
+    WrongBlockBinding,
+}
 
 #[derive(Clone, Serialize, Deserialize, PartialEq, Debug)]
 pub struct Block<I: Identifier + Serialize> {
@@ -52,7 +59,7 @@ impl<I: Identifier + Serialize> Block<I> {
         match self.previous {
             Some(ref prev) => match previous_block {
                 Some(block) => Ok(prev.verify_binding(&Encode::encode(block)?)),
-                None => Err(Error::BlockError("Incorect blocks binding".into())),
+                None => Err(BlockError::WrongBlockBinding.into()),
             },
             None => Ok(previous_block.is_none()),
         }
