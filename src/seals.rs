@@ -1,13 +1,13 @@
 use std::str::FromStr;
 
-use sai::SelfAddressingPrefix;
+use said::SelfAddressingIdentifier;
 use serde::{Deserialize, Deserializer, Serialize, Serializer};
 
 use crate::error::Error;
 
 #[derive(Clone, Debug, PartialEq)]
 pub enum Seal {
-    Attached(SelfAddressingPrefix),
+    Attached(SelfAddressingIdentifier),
 }
 
 impl Seal {

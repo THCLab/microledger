@@ -1,13 +1,13 @@
 use std::{fmt::Display, str::FromStr};
 
-use sai::{derivation::SelfAddressing, SelfAddressingPrefix};
+use said::{derivation::{HashFunctionCode, HashFunction}, SelfAddressingIdentifier};
 use serde::{Deserialize, Deserializer, Serialize, Serializer};
 
 /// A digital fingerprint include the cryptographically derived unique fingerprint of a given block.
 /// The digital fingerprint is a result of a one-way hash function operation on that block.
 #[derive(Clone, Debug, PartialEq)]
 pub enum DigitalFingerprint {
-    SelfAddressing(SelfAddressingPrefix),
+    SelfAddressing(SelfAddressingIdentifier),
 }
 
 impl DigitalFingerprint {
@@ -18,7 +18,7 @@ impl DigitalFingerprint {
     }
 
     pub fn derive(data: &[u8]) -> Self {
-        Self::SelfAddressing(SelfAddressing::Blake3_256.derive(data))
+        Self::SelfAddressing(HashFunction::from(HashFunctionCode::Blake3_256).derive(data))
     }
 }
 
@@ -31,12 +31,12 @@ impl Display for DigitalFingerprint {
 }
 
 impl FromStr for DigitalFingerprint {
-    type Err = sai::error::Error;
+    type Err = said::error::Error;
 
     fn from_str(s: &str) -> Result<Self, Self::Err> {
         match s.get(..1).zip(s.get(1..)) {
             Some(("A", id)) => Ok(Self::SelfAddressing(id.parse()?)),
-            _ => Err(sai::error::Error::DeserializeError("Unknown prefix".into())),
+            _ => Err(said::error::Error::DeserializeError("Unknown prefix".into())),
         }
     }
 }

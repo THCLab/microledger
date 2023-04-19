@@ -41,7 +41,7 @@ pub mod test {
     use base64::{engine::general_purpose, Engine};
     use ed25519_dalek::Signer;
     use rand::rngs::OsRng;
-    use sai::derivation::SelfAddressing;
+    use said::derivation::{HashFunctionCode, HashFunction};
 
     use microledger::{
         block::Block,
@@ -60,9 +60,9 @@ pub mod test {
         // generate keypair
         let id = EasyIdentifier("Identifier1".to_string());
 
-        let seal = SelfAddressing::Blake3_256.derive("exmaple".as_bytes());
+        let seal = HashFunction::from(HashFunctionCode::Blake3_256).derive("exmaple".as_bytes());
         let prev = Some(DigitalFingerprint::SelfAddressing(
-            SelfAddressing::Blake3_256.derive("exmaple".as_bytes()),
+            HashFunction::from(HashFunctionCode::Blake3_256).derive("exmaple".as_bytes()),
         ));
         let block = Block::new(vec![Seal::Attached(seal)], prev, vec![(id)]);
         println!("{}", String::from_utf8(block.encode()?).unwrap());

@@ -48,7 +48,7 @@ where
         }
     }
 
-    pub fn append_block(&mut self, signed_block: SignedBlock<I, S>) -> Result<()> {
+    fn append_block(&mut self, signed_block: SignedBlock<I, S>) -> Result<()> {
         self.blocks.append(&mut vec![signed_block]);
         Ok(())
     }
@@ -134,6 +134,7 @@ where
             .ok_or_else(|| MicroledgerError::MissingBlock(fingerprint.clone()).into())
     }
 
+    /// Returns signed block of given fingerprint
     pub fn get_block_by_fingerprint(
         &self,
         fingerprint: &DigitalFingerprint,

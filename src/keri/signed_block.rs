@@ -61,7 +61,7 @@ mod test {
         processor::basic_processor::BasicProcessor,
     };
     use rand::rngs::OsRng;
-    use sai::derivation::SelfAddressing;
+    use said::derivation::{HashFunctionCode, HashFunction};
     use tempfile::Builder;
 
     use crate::{
@@ -92,9 +92,9 @@ mod test {
                 .as_ref()
                 .to_vec()
         };
-        let seal = SelfAddressing::Blake3_256.derive("exmaple".as_bytes());
+        let seal = HashFunction::from(HashFunctionCode::Blake3_256).derive("exmaple".as_bytes());
         let prev = Some(DigitalFingerprint::SelfAddressing(
-            SelfAddressing::Blake3_256.derive("exmaple".as_bytes()),
+           HashFunction::from(HashFunctionCode::Blake3_256).derive("exmaple".as_bytes()),
         ));
         let block = Block::new(vec![Seal::Attached(seal)], prev, vec![(bp)]);
 

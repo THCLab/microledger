@@ -1,4 +1,4 @@
-use sai::derivation::SelfAddressing;
+use said::derivation::{HashFunctionCode, HashFunction};
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 
@@ -13,7 +13,7 @@ impl SealData {
     pub fn fingerprint(&self) -> Seal {
         match self {
             SealData::AttachedData(data) => {
-                Seal::Attached(SelfAddressing::Blake3_256.derive(data.as_bytes()))
+                Seal::Attached(HashFunction::from(HashFunctionCode::Blake3_256).derive(data.as_bytes()))
             }
         }
     }
