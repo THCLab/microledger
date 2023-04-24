@@ -1,10 +1,13 @@
 use std::{fmt::Debug, sync::Arc};
 
+use said::SelfAddressingIdentifier;
+use said::derivation::HashFunctionCode;
+use said::sad::{SAD, SerializationFormats};
 use serde::{Deserialize, Serialize};
 use thiserror::Error;
 
 use crate::{
-    digital_fingerprint::DigitalFingerprint, error::Error, seals::Seal, verifier::Verifier, Encode,
+    error::Error, seals::Seal, verifier::Verifier, Encode,
     Identifier,
 };
 use crate::{Result, Signature};
@@ -15,17 +18,20 @@ pub enum BlockError {
     WrongBlockBinding,
 }
 
-#[derive(Clone, Serialize, Deserialize, PartialEq, Debug)]
-pub struct Block<I: Identifier + Serialize> {
-    #[serde(rename = "s")]
-    pub seals: Vec<Seal>,
-    #[serde(rename = "p", skip_serializing_if = "Option::is_none")]
-    pub previous: Option<DigitalFingerprint>,
+#[derive(Clone, Serialize, Deserialize, PartialEq, Debug, SAD)]
+pub struct Block<I: Identifier + Serialize + Clone> {
     #[serde(rename = "ci")]
     pub controlling_identifiers: Vec<I>,
+    #[serde(rename = "d")]
+    #[said]
+    pub digital_fingerprint: Option<SelfAddressingIdentifier>,
+    #[serde(rename = "p", skip_serializing_if = "Option::is_none")]
+    pub previous: Option<SelfAddressingIdentifier>,
+    #[serde(rename = "s")]
+    pub seals: Vec<Seal>,
 }
 
-impl<I: Identifier + Serialize> Encode for Block<I> {
+impl<I: Identifier + Serialize + Clone> Encode for Block<I> {
     fn encode(&self) -> Result<Vec<u8>> {
         serde_json::to_string(self)
             .map(|encoded| encoded.as_bytes().to_vec())
@@ -33,17 +39,24 @@ impl<I: Identifier + Serialize> Encode for Block<I> {
     }
 }
 
-impl<I: Identifier + Serialize> Block<I> {
+impl<I: Identifier + Serialize + Clone> Block<I> {
     pub fn new(
         seals: Vec<Seal>,
-        previous: Option<DigitalFingerprint>,
+        previous: Option<SelfAddressingIdentifier>,
         controlling_identifiers: Vec<I>,
     ) -> Self {
-        Self {
+        let mut new_block = Self {
+            digital_fingerprint: None,
             seals,
             previous,
             controlling_identifiers,
-        }
+        };
+        new_block.compute_digest(HashFunctionCode::Blake3_256, SerializationFormats::JSON);
+        new_block
+    }
+
+    pub fn get_fingerprint(&self) -> Result<SelfAddressingIdentifier> {
+        self.digital_fingerprint.clone().ok_or(Error::MissingFingerprintError)
     }
 
     pub fn to_signed_block<S: Signature<Identifier = I>>(
@@ -57,11 +70,11 @@ impl<I: Identifier + Serialize> Block<I> {
     }
 }
 
-impl<I: Identifier + Serialize> Block<I> {
+impl<I: Identifier + Serialize + Clone> Block<I> {
     fn check_previous(&self, previous_block: Option<&Block<I>>) -> Result<bool> {
         match self.previous {
             Some(ref prev) => match previous_block {
-                Some(block) => Ok(prev.verify_binding(&Encode::encode(block)?)),
+                Some(block) => Ok(prev.eq(block.digital_fingerprint.as_ref().ok_or(Error::MissingFingerprintError)?)),
                 None => Err(BlockError::WrongBlockBinding.into()),
             },
             None => Ok(previous_block.is_none()),
@@ -72,7 +85,7 @@ impl<I: Identifier + Serialize> Block<I> {
 #[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct SignedBlock<I, S>
 where
-    I: Identifier + Serialize,
+    I: Identifier + Serialize + Clone,
     S: Signature<Identifier = I>,
 {
     pub block: Block<I>,
@@ -83,7 +96,7 @@ where
 impl<S, I> SignedBlock<I, S>
 where
     S: Clone + Signature<Identifier = I>,
-    I: Identifier + Serialize + PartialEq,
+    I: Identifier + Serialize + PartialEq + Clone,
 {
     pub fn new(block: Block<I>, sigs: Vec<S>) -> Self {
         Self {

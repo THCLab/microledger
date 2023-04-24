@@ -1,7 +1,6 @@
 use error::Error;
 
 pub mod block;
-pub mod digital_fingerprint;
 pub mod error;
 #[cfg(feature = "keri")]
 mod keri;

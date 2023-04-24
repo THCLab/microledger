@@ -1,5 +1,6 @@
 use std::sync::Arc;
 
+use said::SelfAddressingIdentifier;
 use serde::{Deserialize, Serialize};
 use thiserror::Error;
 
@@ -7,7 +8,6 @@ use crate::seal_bundle::SealBundle;
 use crate::verifier::Verifier;
 use crate::{
     block::{Block, SignedBlock},
-    digital_fingerprint::DigitalFingerprint,
     Result,
 };
 use crate::{Encode, Identifier, Signature};
@@ -15,7 +15,7 @@ use crate::{Encode, Identifier, Signature};
 #[derive(Error, Debug)]
 pub enum MicroledgerError {
     #[error("No block of given fingerprint: {0}")]
-    MissingBlock(DigitalFingerprint),
+    MissingBlock(SelfAddressingIdentifier),
     #[error("Block doesn't match")]
     WrongBlock,
     #[error("Signatures doesn't match controlling identifier")]
@@ -27,7 +27,7 @@ pub struct MicroLedger<S, V, I>
 where
     S: Serialize + Signature<Identifier = I>,
     V: Verifier<Signature = S>,
-    I: Identifier + Serialize,
+    I: Identifier + Serialize + Clone,
 {
     #[serde(rename = "bs")]
     pub blocks: Vec<SignedBlock<I, S>>,
@@ -61,20 +61,16 @@ where
         let prev = self
             .blocks
             .last()
-            .map(|sb| -> Result<_> { Ok(DigitalFingerprint::derive(&Encode::encode(&sb.block)?)) });
+            .and_then(|sb| { Some(sb.block.get_fingerprint().unwrap()) });
 
-        let prev = match prev {
-            Some(Ok(sp)) => Some(sp),
-            Some(Err(e)) => return Err(e),
-            None => None,
-        };
         let seals = seal_bundle.get_fingerprints();
         Ok(Block::new(seals, prev, controlling_identifiers))
     }
 
     pub fn anchor(&mut self, block: SignedBlock<I, S>) -> Result<()> {
         let last = self.get_last_block();
-        let controllers_check = match self.current_controlling_identifiers() {
+        let t = self.current_controlling_identifiers();
+        let controllers_check = match t {
             // Provided signatures creators should match controlling identifiers
             // designated in last block
             Some(controllers) => block
@@ -103,11 +99,11 @@ where
     }
 
     /// Returns copy of sub-microledger which last block matches the given fingerprint.
-    pub fn at(&self, block_id: &DigitalFingerprint) -> Option<Self> {
+    pub fn at(&self, block_id: &SelfAddressingIdentifier) -> Option<Self> {
         let position = self
             .blocks
             .iter()
-            .position(|b| Encode::encode(&b.block).map_or(false, |x| block_id.verify_binding(&x)));
+            .position(|b| block_id.eq(b.block.digital_fingerprint.as_ref().unwrap()));
         // .take_while(|b| !block_id.verify_binding(&Serialization::serialize(&b.block))).collect();
         if let Some(position) = position {
             let blocks: Vec<_> = self.blocks.clone().into_iter().take(position + 1).collect();
@@ -126,10 +122,10 @@ where
     }
 
     /// Returns block of given fingerprint
-    pub fn get_block(&self, fingerprint: DigitalFingerprint) -> Result<Block<I>> {
+    pub fn get_block(&self, fingerprint: SelfAddressingIdentifier) -> Result<Block<I>> {
         self.blocks
             .iter()
-            .find(|b| Encode::encode(&b.block).map_or(false, |x| fingerprint.verify_binding(&x)))
+            .find(|b| fingerprint.eq(b.block.digital_fingerprint.as_ref().unwrap()))
             .map(|b| b.block.clone())
             .ok_or_else(|| MicroledgerError::MissingBlock(fingerprint.clone()).into())
     }
@@ -137,11 +133,11 @@ where
     /// Returns signed block of given fingerprint
     pub fn get_block_by_fingerprint(
         &self,
-        fingerprint: &DigitalFingerprint,
+        fingerprint: &SelfAddressingIdentifier,
     ) -> Result<&SignedBlock<I, S>> {
         self.blocks
             .iter()
-            .find(|b| Encode::encode(&b.block).map_or(false, |x| fingerprint.verify_binding(&x)))
+            .find(|b| fingerprint.eq(b.block.digital_fingerprint.as_ref().unwrap()))
             .ok_or_else(|| MicroledgerError::MissingBlock(fingerprint.clone()).into())
     }
 
