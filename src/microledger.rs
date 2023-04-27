@@ -58,12 +58,10 @@ where
         controlling_identifiers: Vec<I>,
         seal_bundle: &SealBundle,
     ) -> Result<Block<I>> {
-        let prev = self.blocks.last().and_then(|sb| {
-            Some(
-                sb.block
-                    .get_fingerprint()
-                    .expect("Block without fingerprint"),
-            )
+        let prev = self.blocks.last().map(|sb| {
+            sb.block
+                .get_fingerprint()
+                .expect("Block without fingerprint")
         });
 
         let seals = seal_bundle.get_fingerprints();
