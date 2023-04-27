@@ -1,4 +1,4 @@
-use said::derivation::{HashFunctionCode, HashFunction};
+use said::derivation::{HashFunction, HashFunctionCode};
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 
@@ -12,9 +12,9 @@ pub enum SealData {
 impl SealData {
     pub fn fingerprint(&self) -> Seal {
         match self {
-            SealData::AttachedData(data) => {
-                Seal::Attached(HashFunction::from(HashFunctionCode::Blake3_256).derive(data.as_bytes()))
-            }
+            SealData::AttachedData(data) => Seal::Attached(
+                HashFunction::from(HashFunctionCode::Blake3_256).derive(data.as_bytes()),
+            ),
         }
     }
 }

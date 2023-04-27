@@ -61,12 +61,11 @@ mod test {
         processor::basic_processor::BasicProcessor,
     };
     use rand::rngs::OsRng;
-    use said::derivation::{HashFunctionCode, HashFunction};
+    use said::derivation::{HashFunction, HashFunctionCode};
     use tempfile::Builder;
 
     use crate::{
         block::{Block, SignedBlock},
-        digital_fingerprint::DigitalFingerprint,
         keri::KeriSignature,
         seals::Seal,
         Encode, Result,
@@ -93,10 +92,8 @@ mod test {
                 .to_vec()
         };
         let seal = HashFunction::from(HashFunctionCode::Blake3_256).derive("exmaple".as_bytes());
-        let prev = Some(DigitalFingerprint::SelfAddressing(
-           HashFunction::from(HashFunctionCode::Blake3_256).derive("exmaple".as_bytes()),
-        ));
-        let block = Block::new(vec![Seal::Attached(seal)], prev, vec![(bp)]);
+        let prev = HashFunction::from(HashFunctionCode::Blake3_256).derive("exmaple".as_bytes());
+        let block = Block::new(vec![Seal::Attached(seal)], Some(prev), vec![(bp)]);
 
         let sig = KeriSignature::NonTransferable(Nontransferable::Couplet(vec![(
             pref,

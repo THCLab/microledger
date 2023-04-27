@@ -41,7 +41,7 @@ pub mod test {
     use base64::{engine::general_purpose, Engine};
     use ed25519_dalek::Signer;
     use rand::rngs::OsRng;
-    use said::derivation::{HashFunctionCode, HashFunction};
+    use said::derivation::{HashFunction, HashFunctionCode};
 
     use microledger::{
         block::Block,
@@ -60,9 +60,8 @@ pub mod test {
         let id = EasyIdentifier("Identifier1".to_string());
 
         let seal = HashFunction::from(HashFunctionCode::Blake3_256).derive("exmaple".as_bytes());
-        let prev = Some(
-            HashFunction::from(HashFunctionCode::Blake3_256).derive("exmaple".as_bytes()),
-        );
+        let prev =
+            Some(HashFunction::from(HashFunctionCode::Blake3_256).derive("exmaple".as_bytes()));
         let block = Block::new(vec![Seal::Attached(seal)], prev, vec![(id)]);
         println!("{}", String::from_utf8(block.encode()?).unwrap());
 
@@ -114,7 +113,9 @@ pub mod test {
         assert!(microledger.blocks.is_empty());
 
         let b64_signature = general_purpose::STANDARD_NO_PAD.encode(sign(block.encode()?));
-        let signed = block.clone().to_signed_block(vec![EdSignature(b64_signature)]);
+        let signed = block
+            .clone()
+            .to_signed_block(vec![EdSignature(b64_signature)]);
 
         microledger.anchor(signed)?;
         assert_eq!(microledger.blocks.len(), 1);

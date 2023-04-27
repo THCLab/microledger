@@ -27,7 +27,7 @@ pub enum Error {
 
     #[error("Can't parse cesr stream")]
     CesrError,
-    
+
     #[error("Missing fingerprint")]
     MissingFingerprintError,
 }

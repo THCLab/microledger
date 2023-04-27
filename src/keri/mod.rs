@@ -32,7 +32,7 @@ where
         let mut microledger = MicroLedger::new(verifier);
         parsed_stream
             .into_iter()
-            .try_for_each(|pd| microledger.append_block(pd.try_into()?))?;
+            .try_for_each(|pd| microledger.anchor(pd.try_into()?))?;
         Ok(microledger)
     }
 

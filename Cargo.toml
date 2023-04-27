@@ -7,17 +7,17 @@ edition = "2018"
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
-#[features]
-keri = ["keri", "cesrox"]
+[features]
+keriox = ["keri", "cesrox"]
 
 [dependencies]
 serde_json = "1"
 serde = {version="1", features = ["derive"]}
 thiserror = "1.0.29"
 clap = "3.0.0-beta.4"
-said = {git = "https://github.com/THCLab/cesrox", features = ["macros"]}
-cesrox = {git = "https://github.com/THCLab/cesrox", optional = true}
-keri = {git = "https://github.com/THCLab/keriox", tag = "v0.2.0", optional = true}
+said = {git = "https://github.com/THCLab/cesrox",  tag = "v0.1.4"}
+cesrox = {git = "https://github.com/THCLab/cesrox",  tag = "v0.1.4", optional = true}
+keri = {git = "https://github.com/THCLab/keriox", optional = true}
 
 [dev-dependencies]
 ed25519-dalek = "1.0.1"

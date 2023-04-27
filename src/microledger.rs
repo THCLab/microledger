@@ -10,7 +10,7 @@ use crate::{
     block::{Block, SignedBlock},
     Result,
 };
-use crate::{Encode, Identifier, Signature};
+use crate::{Identifier, Signature};
 
 #[derive(Error, Debug)]
 pub enum MicroledgerError {
@@ -58,10 +58,13 @@ where
         controlling_identifiers: Vec<I>,
         seal_bundle: &SealBundle,
     ) -> Result<Block<I>> {
-        let prev = self
-            .blocks
-            .last()
-            .and_then(|sb| { Some(sb.block.get_fingerprint().unwrap()) });
+        let prev = self.blocks.last().and_then(|sb| {
+            Some(
+                sb.block
+                    .get_fingerprint()
+                    .expect("Block without fingerprint"),
+            )
+        });
 
         let seals = seal_bundle.get_fingerprints();
         Ok(Block::new(seals, prev, controlling_identifiers))

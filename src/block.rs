@@ -1,15 +1,13 @@
 use std::{fmt::Debug, sync::Arc};
 
-use said::SelfAddressingIdentifier;
 use said::derivation::HashFunctionCode;
-use said::sad::{SAD, SerializationFormats};
+use said::sad::sad_macros::SAD;
+use said::sad::{SerializationFormats, SAD};
+use said::SelfAddressingIdentifier;
 use serde::{Deserialize, Serialize};
 use thiserror::Error;
 
-use crate::{
-    error::Error, seals::Seal, verifier::Verifier, Encode,
-    Identifier,
-};
+use crate::{error::Error, seals::Seal, verifier::Verifier, Encode, Identifier};
 use crate::{Result, Signature};
 
 #[derive(Error, Debug)]
@@ -45,18 +43,19 @@ impl<I: Identifier + Serialize + Clone> Block<I> {
         previous: Option<SelfAddressingIdentifier>,
         controlling_identifiers: Vec<I>,
     ) -> Self {
-        let mut new_block = Self {
+        let new_block = Self {
             digital_fingerprint: None,
             seals,
             previous,
             controlling_identifiers,
         };
-        new_block.compute_digest(HashFunctionCode::Blake3_256, SerializationFormats::JSON);
-        new_block
+        new_block.compute_digest(HashFunctionCode::Blake3_256, SerializationFormats::JSON)
     }
 
     pub fn get_fingerprint(&self) -> Result<SelfAddressingIdentifier> {
-        self.digital_fingerprint.clone().ok_or(Error::MissingFingerprintError)
+        self.digital_fingerprint
+            .clone()
+            .ok_or(Error::MissingFingerprintError)
     }
 
     pub fn to_signed_block<S: Signature<Identifier = I>>(
@@ -74,7 +73,10 @@ impl<I: Identifier + Serialize + Clone> Block<I> {
     fn check_previous(&self, previous_block: Option<&Block<I>>) -> Result<bool> {
         match self.previous {
             Some(ref prev) => match previous_block {
-                Some(block) => Ok(prev.eq(block.digital_fingerprint.as_ref().ok_or(Error::MissingFingerprintError)?)),
+                Some(block) => Ok(prev.eq(block
+                    .digital_fingerprint
+                    .as_ref()
+                    .ok_or(Error::MissingFingerprintError)?)),
                 None => Err(BlockError::WrongBlockBinding.into()),
             },
             None => Ok(previous_block.is_none()),

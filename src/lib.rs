@@ -2,8 +2,8 @@ use error::Error;
 
 pub mod block;
 pub mod error;
-#[cfg(feature = "keri")]
-mod keri;
+#[cfg(feature = "keriox")]
+pub mod keri;
 pub mod microledger;
 pub mod seal_bundle;
 pub mod seals;
